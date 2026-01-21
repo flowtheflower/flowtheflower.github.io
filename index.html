@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow | Cyber Bento</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --card-bg: #0a0a0a;
+            --accent: #00ff41;
+            --text-dim: #888;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            color: var(--accent);
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            margin: 60px 0 20px 0;
+            font-size: 3rem;
+            text-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+        }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: 200px;
+            gap: 20px;
+            width: 90%;
+            max-width: 1200px;
+            padding-bottom: 100px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid #1a1a1a;
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 24px;
+            cursor: pointer;
+            transition: border-color 0.4s ease;
+        }
+
+        /* The Image Container for Hover Animation */
+        .img-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .card-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.5;
+            transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+        }
+
+        /* Hover Behavior: Image Zooms and Brightens */
+        .card:hover .card-img {
+            transform: scale(1.1);
+            opacity: 0.8;
+        }
+
+        .card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 25px rgba(0, 255, 65, 0.1);
+        }
+
+        /* Content Overlay */
+        .content {
+            position: relative;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .card span {
+            display: block;
+            font-weight: 800;
+            font-size: 1.4rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #fff;
+        }
+
+        /* Sizes */
+        .wide { grid-column: span 2; }
+        .tall { grid-row: span 2; }
+        .large { grid-column: span 2; grid-row: span 2; }
+
+        /* Scrim effect for text readability */
+        .card::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 60%;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            z-index: 1;
+        }
+
+        @media (max-width: 800px) {
+            .bento-grid { grid-template-columns: 1fr 1fr; }
+            .large, .wide { grid-column: span 2; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>FLOW</h1>
+
+    <div class="bento-grid">
+        <div class="card wide">
+            <div class="img-container"><img src="https://picsum.photos/id/24/800/400" class="card-img" alt="Novel"></div>
+            <div class="content"><span>Novel</span></div>
+        </div>
+
+        <div class="card">
+            <div class="img-container"><img src="https://picsum.photos/id/1073/400/400" class="card-img" alt="Manga"></div>
+            <div class="content"><span>Manga</span></div>
+        </div>
+
+        <div class="card tall">
+            <div class="img-container"><img src="https://picsum.photos/id/342/400/800" class="card-img" alt="Anime"></div>
+            <div class="content"><span>Anime</span></div>
+        </div>
+
+        <div class="card large">
+            <div class="img-container"><img src="https://picsum.photos/id/122/800/800" class="card-img" alt="Mission"></div>
+            <div class="content"><span>Mission</span></div>
+        </div>
+
+        <div class="card">
+            <div class="img-container"><img src="https://picsum.photos/id/366/400/400" class="card-img" alt="Wiki"></div>
+            <div class="content"><span>Wiki</span></div>
+        </div>
+
+        <div class="card wide">
+            <div class="img-container"><img src="https://picsum.photos/id/445/800/400" class="card-img" alt="Merch"></div>
+            <div class="content"><span>Merch</span></div>
+        </div>
+
+        <div class="card">
+            <div class="img-container"><img src="https://picsum.photos/id/306/400/400" class="card-img" alt="CannaIndex"></div>
+            <div class="content"><span>Index</span></div>
+        </div>
+    </div>
+
+</body>
+</html>
