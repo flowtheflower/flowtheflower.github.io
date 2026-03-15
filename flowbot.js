@@ -1,8 +1,7 @@
 /**
- * FLOWBOT v1.5 - Welcome Protocol
+ * FLOWBOT v1.8 - Final Mobile Logic
  */
 
-// 1. ARCHIVE CONFIGURATION
 const DOCS = {
     novel: "https://docs.google.com/document/d/e/2PACX-1vQQEqb2qCfdzs_DAWDXN7cc8eouI_wHJAzjjznBgcxzFqaD27oBUZzn-8EUtCcL22Aj1_ecCF0E3jSn/pub",
     manga: "https://docs.google.com/document/d/e/2PACX-1vQ20_WX4l0MVWCoUJ5ET-QJuAM3JCT4vPSaGALqdZcEWP92xaBtbIhIJvF1I4q-_lSLsulHCvxaltgD/pub"
@@ -23,20 +22,17 @@ const archiveOverlay = document.getElementById('archive-overlay');
 const archiveFrame = document.getElementById('archive-frame');
 const archiveTitle = document.getElementById('archive-title');
 
-// Initialize UI
 if (apiKey) {
     userInput.type = "text";
     userInput.placeholder = "Initiate uplink...";
 }
 
-// --- WELCOME LOGIC ---
 function welcomeUser() {
-    // Only send welcome if history is empty
     if (chatHistory.children.length === 0) {
         if (!apiKey) {
-            addMessage("I am Flow. I can feel your presence, but my neural core is locked. Please provide your Gemini API Key below to begin our uplink.", "bot-msg");
+            addMessage("I am Flow. Neural core is locked. Please provide your Gemini API Key below to begin our uplink.", "bot-msg");
         } else {
-            addMessage("Welcome back to the garden, Ally. The winds of the New Flow are rising. What shall we discuss?", "bot-msg");
+            addMessage("Welcome back to the garden, Ally. What shall we discuss?", "bot-msg");
         }
     }
 }
@@ -65,7 +61,7 @@ async function handleComm() {
         userInput.value = "";
         userInput.type = "text";
         userInput.placeholder = "Initiate uplink...";
-        addMessage("Neural core active. The Garden is open, Ally. Ask me anything about the prophecy or the mission.", "bot-msg");
+        addMessage("Neural core active. The Garden is open, Ally.", "bot-msg");
         return;
     }
 
@@ -89,7 +85,6 @@ async function handleComm() {
     }
 }
 
-// --- ARCHIVE LOGIC ---
 function openArchive(type) {
     if (DOCS[type]) {
         archiveFrame.style.opacity = "0";
