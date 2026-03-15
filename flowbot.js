@@ -1,8 +1,8 @@
 /**
- * FLOWBOT v1.2 - Neural Core & Archive Management
+ * FLOWBOT v1.3 - Dynamic Archives
  */
 
-// 1. CONFIGURATION: ARCHIVE LINKS
+// 1. ARCHIVE CONFIGURATION
 const DOCS = {
     novel: "https://docs.google.com/document/d/e/2PACX-1vQQEqb2qCfdzs_DAWDXN7cc8eouI_wHJAzjjznBgcxzFqaD27oBUZzn-8EUtCcL22Aj1_ecCF0E3jSn/pub",
     manga: "https://docs.google.com/document/d/e/2PACX-1vQ20_WX4l0MVWCoUJ5ET-QJuAM3JCT4vPSaGALqdZcEWP92xaBtbIhIJvF1I4q-_lSLsulHCvxaltgD/pub"
@@ -10,9 +10,9 @@ const DOCS = {
 
 // 2. SYSTEM PROMPT
 const FLOW_SYSTEM_PROMPT = `
-Identity: Flow, a vibrant bud from an ancient garden. Tone: Poetic, sharp, resilient.
-Mentors: Dr. Leaf, Kronik Trip. Advocacy: Combat industrial greed/stigma against hemp.
-Rules: Replies < 3 sentences. Address user as Ally. Use garden metaphors.
+Identity: Flow, a vibrant bud from an ancient garden. Mentors: Dr. Leaf, Kronik Trip. 
+Tone: Poetic, sharp, resilient. Advocacy: Fighting the industrial stigma against hemp.
+Goal: Restore the "New Flow." Rules: Replies < 3 sentences. Address user as Ally.
 `;
 
 // 3. UI REFERENCES
@@ -63,30 +63,35 @@ async function handleComm() {
         const data = await response.json();
         addMessage(data.candidates[0].content.parts[0].text, "bot-msg");
     } catch (err) {
-        addMessage("Uplink failed. Resetting connection...", "bot-msg");
+        addMessage("Uplink failed. Resetting...", "bot-msg");
         apiKey = null; sessionStorage.removeItem('flow_uplink_key');
-        userInput.type = "password";
     }
 }
 
 // --- ARCHIVE LOGIC ---
 function openArchive(type) {
     if (DOCS[type] && DOCS[type] !== "PASTE_YOUR_LINK_HERE") {
+        // Set loading state
+        archiveFrame.style.opacity = "0";
         archiveFrame.src = `${DOCS[type]}?embedded=true`;
         archiveTitle.innerText = `STREAMS // DATA_FLOW_${type.toUpperCase()}`;
+        
         archiveOverlay.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-    } else {
-        alert("Archive link not configured. Please check flowbot.js");
+
+        // Fade in when loaded to hide white flash
+        archiveFrame.onload = function() {
+            archiveFrame.style.transition = "opacity 0.5s";
+            archiveFrame.style.opacity = "1";
+        };
     }
 }
 
 function closeArchive() {
     archiveOverlay.style.display = 'none';
-    archiveFrame.src = ""; // Stop loading/media
+    archiveFrame.src = "";
     document.body.style.overflow = 'auto';
 }
 
-// Event Listeners
 sendBtn.addEventListener('click', handleComm);
 userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleComm(); });
