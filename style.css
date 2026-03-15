@@ -49,7 +49,9 @@ header h1 { font-size: clamp(2.5rem, 10vw, 4.5rem); letter-spacing: 15px; font-w
     border-radius: 50%; 
     border: 1px solid var(--accent); 
     object-fit: cover; /* Forces image to fit circle */
+    object-position: center; /* Ensures the center of the bud is visible */
     flex-shrink: 0;    /* Prevents iPhone from squishing it */
+    display: block;
 }
 
 #chat-history { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -63,5 +65,5 @@ header h1 { font-size: clamp(2.5rem, 10vw, 4.5rem); letter-spacing: 15px; font-w
 
 @media (max-width: 600px) { 
     .bento-grid { grid-template-columns: 1fr; grid-auto-rows: 180px; } 
-    #chat-window { width: 85vw; bottom: 80px; } 
+    #chat-window { width: 90vw; max-width: 350px; bottom: 85px; right: 5vw; }
 }
