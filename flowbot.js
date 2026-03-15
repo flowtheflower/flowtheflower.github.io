@@ -1,5 +1,5 @@
 /**
- * FLOWBOT v1.3 - Dynamic Archives
+ * FLOWBOT v1.5 - Welcome Protocol
  */
 
 // 1. ARCHIVE CONFIGURATION
@@ -8,14 +8,12 @@ const DOCS = {
     manga: "https://docs.google.com/document/d/e/2PACX-1vQ20_WX4l0MVWCoUJ5ET-QJuAM3JCT4vPSaGALqdZcEWP92xaBtbIhIJvF1I4q-_lSLsulHCvxaltgD/pub"
 };
 
-// 2. SYSTEM PROMPT
 const FLOW_SYSTEM_PROMPT = `
-Identity: Flow, a vibrant bud from an ancient garden. Mentors: Dr. Leaf, Kronik Trip. 
-Tone: Poetic, sharp, resilient. Advocacy: Fighting the industrial stigma against hemp.
-Goal: Restore the "New Flow." Rules: Replies < 3 sentences. Address user as Ally.
+Identity: Flow, a vibrant bud from an ancient garden. Tone: Poetic, sharp, resilient.
+Mentors: Dr. Leaf, Kronik Trip. Advocacy: Combat industrial greed/stigma against hemp.
+Rules: Replies < 3 sentences. Address user as Ally. Use garden metaphors.
 `;
 
-// 3. UI REFERENCES
 let apiKey = sessionStorage.getItem('flow_uplink_key');
 const chatHistory = document.getElementById('chat-history');
 const userInput = document.getElementById('user-input');
@@ -25,10 +23,22 @@ const archiveOverlay = document.getElementById('archive-overlay');
 const archiveFrame = document.getElementById('archive-frame');
 const archiveTitle = document.getElementById('archive-title');
 
-// --- CHAT LOGIC ---
-function toggleChat() {
-    chatWindow.style.display = (chatWindow.style.display === 'flex') ? 'none' : 'flex';
-    if (apiKey) { userInput.type = "text"; userInput.placeholder = "Initiate uplink..."; }
+// Initialize UI
+if (apiKey) {
+    userInput.type = "text";
+    userInput.placeholder = "Initiate uplink...";
+}
+
+// --- WELCOME LOGIC ---
+function welcomeUser() {
+    // Only send welcome if history is empty
+    if (chatHistory.children.length === 0) {
+        if (!apiKey) {
+            addMessage("I am Flow. I can feel your presence, but my neural core is locked. Please provide your Gemini API Key below to begin our uplink.", "bot-msg");
+        } else {
+            addMessage("Welcome back to the garden, Ally. The winds of the New Flow are rising. What shall we discuss?", "bot-msg");
+        }
+    }
 }
 
 function addMessage(text, type) {
@@ -39,6 +49,12 @@ function addMessage(text, type) {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
+function toggleChat() {
+    const isOpening = chatWindow.style.display !== 'flex';
+    chatWindow.style.display = isOpening ? 'flex' : 'none';
+    if (isOpening) welcomeUser();
+}
+
 async function handleComm() {
     const val = userInput.value.trim();
     if (!val) return;
@@ -46,8 +62,10 @@ async function handleComm() {
     if (!apiKey) {
         apiKey = val;
         sessionStorage.setItem('flow_uplink_key', apiKey);
-        userInput.value = ""; userInput.type = "text";
-        addMessage("Neural core active. The Garden is open, Ally.", "bot-msg");
+        userInput.value = "";
+        userInput.type = "text";
+        userInput.placeholder = "Initiate uplink...";
+        addMessage("Neural core active. The Garden is open, Ally. Ask me anything about the prophecy or the mission.", "bot-msg");
         return;
     }
 
@@ -55,7 +73,7 @@ async function handleComm() {
     userInput.value = "";
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: `SYSTEM: ${FLOW_SYSTEM_PROMPT}\nUSER: ${val}` }] }] })
@@ -63,24 +81,23 @@ async function handleComm() {
         const data = await response.json();
         addMessage(data.candidates[0].content.parts[0].text, "bot-msg");
     } catch (err) {
-        addMessage("Uplink failed. Resetting...", "bot-msg");
-        apiKey = null; sessionStorage.removeItem('flow_uplink_key');
+        addMessage("Uplink failed. Resetting connection...", "bot-msg");
+        apiKey = null; 
+        sessionStorage.removeItem('flow_uplink_key');
+        userInput.type = "password";
+        userInput.placeholder = "Enter API Key...";
     }
 }
 
 // --- ARCHIVE LOGIC ---
 function openArchive(type) {
-    if (DOCS[type] && DOCS[type] !== "PASTE_YOUR_LINK_HERE") {
-        // Set loading state
+    if (DOCS[type]) {
         archiveFrame.style.opacity = "0";
         archiveFrame.src = `${DOCS[type]}?embedded=true`;
         archiveTitle.innerText = `STREAMS // DATA_FLOW_${type.toUpperCase()}`;
-        
         archiveOverlay.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-
-        // Fade in when loaded to hide white flash
-        archiveFrame.onload = function() {
+        archiveFrame.onload = () => {
             archiveFrame.style.transition = "opacity 0.5s";
             archiveFrame.style.opacity = "1";
         };
