@@ -25,14 +25,20 @@
     </header>
 
     <main class="bento-grid">
-        <a href="javascript:void(0)" class="card" onclick="openNovel()">
+        <a href="javascript:void(0)" class="card" onclick="openArchive('novel')">
             <img src="https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=1200" class="card-img" alt="Novel">
-            <div class="content"><h3>Novel</h3><p>Data Archives // Read</p></div>
+            <div class="content">
+                <h3>Novel</h3>
+                <p>Data Archives // Read</p>
+            </div>
         </a>
         
-        <a href="#" class="card wide">
+        <a href="javascript:void(0)" class="card wide" onclick="openArchive('manga')">
             <img src="https://flowtheflower.github.io/flowmanga1.gif" class="card-img" alt="Manga">
-            <div class="content"><h3>Manga</h3></div>
+            <div class="content">
+                <h3>Manga</h3>
+                <p>Visual Uplink // View</p>
+            </div>
         </a>
 
         <a href="#" class="card tall">
@@ -66,13 +72,13 @@
         </a>
     </main>
 
-    <div id="novel-reader" class="overlay">
+    <div id="archive-overlay" class="overlay">
         <div class="reader-header">
-            <button onclick="closeNovel()" class="back-btn">← EXIT_ARCHIVE</button>
-            <span class="reader-title">STREAMS // DATA_FLOW_NOVEL</span>
+            <button onclick="closeArchive()" class="back-btn">← EXIT_ARCHIVE</button>
+            <span id="archive-title" class="reader-title">STREAMS // DATA_FLOW</span>
         </div>
         <div class="reader-container">
-            <iframe src="https://docs.google.com/document/d/e/2PACX-1vQQEqb2qCfdzs_DAWDXN7cc8eouI_wHJAzjjznBgcxzFqaD27oBUZzn-8EUtCcL22Aj1_ecCF0E3jSn/pub?embedded=true"></iframe>
+            <iframe id="archive-frame" src=""></iframe>
         </div>
     </div>
 
@@ -84,7 +90,7 @@
                 <button onclick="toggleChat()" class="close-chat">_</button>
             </div>
             <div id="chat-history">
-                <div class="message bot-msg">Uplink established. I am Flow. Provide your Gemini API Key to unlock my neural core.</div>
+                <div class="message bot-msg">Uplink established. I am Flow. Please provide your Gemini API Key to initialize my neural core.</div>
             </div>
             <div class="chat-input-area">
                 <input type="password" id="user-input" placeholder="Enter API Key...">
