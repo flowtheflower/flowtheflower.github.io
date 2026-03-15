@@ -1,0 +1,20 @@
+{
+  "name": "Flow The Flower",
+  "short_name": "Flow",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#00ff41",
+  "icons": [
+    {
+      "src": "flowbot.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "flowbot.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
