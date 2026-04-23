@@ -40,28 +40,134 @@ header h1 { font-size: clamp(2.5rem, 10vw, 4.5rem); letter-spacing: 15px; font-w
 
 #chat-window { width: 350px; height: 500px; max-height: 70vh; background: #050505; border: 1px solid #1a1a1a; border-radius: 15px; margin-bottom: 15px; display: none; flex-direction: column; box-shadow: 0 10px 40px #000; }
 
-/* CHAT ICON FIXES */
 .chat-header { padding: 12px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 10px; color: var(--accent); font-family: monospace; font-size: 0.7rem; }
-
-.bot-icon-small { 
-    width: 24px; 
-    height: 24px; 
-    border-radius: 50%; 
-    border: 1px solid var(--accent); 
-    object-fit: cover; /* Forces image to fit circle */
-    object-position: center; /* Ensures the center of the bud is visible */
-    flex-shrink: 0;    /* Prevents iPhone from squishing it */
-    display: block;
-}
+.bot-icon-small { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--accent); object-fit: cover; object-position: center; flex-shrink: 0; display: block; }
 
 #chat-history { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .message { padding: 10px 14px; border-radius: 12px; font-size: 0.85rem; max-width: 80%; line-height: 1.4; }
 .bot-msg { background: #111; color: var(--text-silver); align-self: flex-start; border: 1px solid #222; position: relative; }
 .user-msg { background: var(--accent); color: #000; align-self: flex-end; font-weight: bold; }
 .chat-input-area { padding: 15px; border-top: 1px solid #111; display: flex; gap: 8px; }
-
 #user-input { background: #000; border: 1px solid #222; color: white; padding: 10px; flex: 1; border-radius: 8px; outline: none; font-size: 16px; }
 .send-btn { background: none; border: 1px solid var(--accent); color: var(--accent); padding: 5px 12px; cursor: pointer; font-size: 0.7rem; }
+
+/* --- GAME CARD --- */
+.game-card {
+    border-color: rgba(0, 255, 65, 0.2);
+    cursor: pointer;
+}
+
+.game-card::after {
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,10,0,0.4) 60%, transparent 100%);
+}
+
+.game-card:hover {
+    border-color: rgba(0, 255, 65, 0.6);
+    box-shadow: 0 0 30px rgba(0, 255, 65, 0.08);
+}
+
+.game-card:hover .orb {
+    animation-play-state: running;
+}
+
+/* Pixel grid background texture */
+.game-card-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.game-pixel-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Floating glow orbs */
+.game-orbs {
+    position: absolute;
+    inset: 0;
+}
+
+.orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(30px);
+    animation-play-state: paused;
+    transition: opacity 0.5s;
+}
+
+.orb1 {
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, rgba(0,255,65,0.18) 0%, transparent 70%);
+    top: -20px; left: 10%;
+    animation: floatOrb1 6s ease-in-out infinite;
+}
+
+.orb2 {
+    width: 80px; height: 80px;
+    background: radial-gradient(circle, rgba(0,200,255,0.12) 0%, transparent 70%);
+    bottom: 30px; right: 20%;
+    animation: floatOrb2 8s ease-in-out infinite 1s;
+}
+
+.orb3 {
+    width: 60px; height: 60px;
+    background: radial-gradient(circle, rgba(180,255,0,0.1) 0%, transparent 70%);
+    top: 40%; left: 55%;
+    animation: floatOrb3 5s ease-in-out infinite 2s;
+}
+
+.game-card:hover .orb {
+    animation-play-state: running;
+}
+
+/* Always drift slowly even without hover — subtle life */
+.orb1 { animation-play-state: running; }
+
+@keyframes floatOrb1 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(15px, 20px); }
+}
+@keyframes floatOrb2 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(-10px, -15px); }
+}
+@keyframes floatOrb3 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(8px, -10px); }
+}
+
+/* PLAYABLE badge */
+.game-badge {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 2;
+    font-family: monospace;
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    color: var(--accent);
+    border: 1px solid rgba(0,255,65,0.4);
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(0,255,65,0.05);
+    animation: pulseBadge 3s ease-in-out infinite;
+}
+
+@keyframes pulseBadge {
+    0%, 100% { opacity: 0.6; border-color: rgba(0,255,65,0.3); }
+    50% { opacity: 1; border-color: rgba(0,255,65,0.7); }
+}
+
+/* Ensure content sits above bg layers */
+.game-card .content {
+    position: relative;
+    z-index: 2;
+}
 
 @media (max-width: 600px) { 
     .bento-grid { grid-template-columns: 1fr; grid-auto-rows: 180px; } 
