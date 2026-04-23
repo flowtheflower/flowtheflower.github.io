@@ -1,436 +1,629 @@
-const config = {
-    type: Phaser.AUTO,
-    width: 360,
-    height: 640,
-    backgroundColor: '#0d1f2d',
-    physics: {
-        default: 'arcade',
-        arcade: { gravity: { y: 0 }, debug: false }
-    },
-    scene: { preload, create, update }
+/**
+ * FLOW: BLOOMFALL — game.js
+ * ─────────────────────────────────────────────────────────────
+ * Architecture:
+ *   MenuScene  — title screen
+ *   GameScene  — main gameplay (reads from FLOW_LEVELS in levels.js)
+ *   UIScene    — HUD overlay running parallel to GameScene
+ *   WinScene   — level complete screen
+ *
+ * Spritesheet (flow_game.png) — 102×102 per frame, 4 cols × 6 rows:
+ *   Row 0  frames  0– 3  IDLE
+ *   Row 1  frames  4– 7  RUN
+ *   Row 2  frames  8–11  HAPPY
+ *   Row 3  frames 12–15  LOW_ENERGY
+ *   Row 4  frames 16–19  JUMP
+ *   Row 5  frames 20–23  LAND
+ */
+
+'use strict';
+
+// ── CONSTANTS ─────────────────────────────────────────────────
+const FRAME_W    = 102;
+const FRAME_H    = 102;
+
+const ANIM_DEFS = {
+    idle:       { start: 0,  end: 3,  rate: 6,  loop: true  },
+    run:        { start: 4,  end: 7,  rate: 10, loop: true  },
+    happy:      { start: 8,  end: 11, rate: 8,  loop: true  },
+    low_energy: { start: 12, end: 15, rate: 6,  loop: true  },
+    jump:       { start: 16, end: 19, rate: 10, loop: false },
+    land:       { start: 20, end: 23, rate: 12, loop: false },
 };
 
-new Phaser.Game(config);
+const C = {
+    grow:  { dead: 0x1a2e1a, alive: 0x00cc44, glow: 0x00ff66, particle: 0x44ff88 },
+    water: { dead: 0x0d1a2e, alive: 0x0077cc, glow: 0x00aaff, particle: 0x66ccff },
+    bloom: { dead: 0x2e0d2e, alive: 0xcc44cc, glow: 0xff66ff, particle: 0xff99ff },
+};
 
-// --- STATE ---
-let player;
-let energy = 100, maxEnergy = 100;
-let objects = [];
-let energyBar, energyText;
-let gameEnded = false;
-let score = 0;
-let scoreText;
-let bgStars = [];
+const ENERGY_COST   = 18;
+const PLAYER_SPEED  = 95;
+const JUMP_VEL      = -340;
+const GROUND_Y      = 460;
+const PLAYER_SCALE  = 2.8;
 
-// --- PRELOAD ---
-function preload() {
-    // Sprite sheet — your flow.png in assets/
-    this.load.spritesheet('flow', 'assets/flow.png', {
-        frameWidth: 32,
-        frameHeight: 32
+// ── PHASER BOOT ───────────────────────────────────────────────
+window.addEventListener('load', () => {
+    new Phaser.Game({
+        type:            Phaser.AUTO,
+        width:           360,
+        height:          640,
+        backgroundColor: '#050505',
+        physics:         { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
+        scene:           [MenuScene, GameScene, UIScene, WinScene],
     });
+});
 
-    // Particle image — simple white dot fallback (no external dependency)
-    // We generate it procedurally so no file needed
-    const g = this.make.graphics({ x: 0, y: 0, add: false });
-    g.fillStyle(0x00ff88, 1);
-    g.fillCircle(4, 4, 4);
-    g.generateTexture('particle', 8, 8);
-    g.destroy();
+// ═════════════════════════════════════════════════════════════
+//  MENU SCENE
+// ═════════════════════════════════════════════════════════════
+class MenuScene extends Phaser.Scene {
+    constructor() { super({ key: 'MenuScene' }); }
 
-    // Optional sounds — gracefully skipped if files missing
-    this.load.audio('tap', 'assets/tap.wav');
-    this.load.audio('grow', 'assets/grow.wav');
-    this.load.audio('finale', 'assets/finale.wav');
-}
-
-// --- CREATE ---
-function create() {
-
-    const W = this.scale.width;
-    const H = this.scale.height;
-
-    // ── BACKGROUND ──────────────────────────────────────────
-    this.cameras.main.setBackgroundColor('#0d1f2d');
-
-    // Subtle star field
-    const starGfx = this.add.graphics();
-    for (let i = 0; i < 60; i++) {
-        const x = Phaser.Math.Between(0, W * 8);
-        const y = Phaser.Math.Between(0, H);
-        const alpha = Phaser.Math.FloatBetween(0.1, 0.5);
-        const size = Phaser.Math.FloatBetween(0.5, 1.5);
-        starGfx.fillStyle(0xffffff, alpha);
-        starGfx.fillCircle(x, y, size);
+    preload() {
+        this.load.spritesheet('flow', 'assets/flow_game.png', {
+            frameWidth: FRAME_W, frameHeight: FRAME_H,
+        });
+        // Sounds are optional — game works without them
+        this.load.audio('tap',    'assets/tap.wav');
+        this.load.audio('grow',   'assets/grow.wav');
+        this.load.audio('finale', 'assets/finale.wav');
     }
 
-    // Ground line
-    const ground = this.add.graphics();
-    ground.fillStyle(0x1a3a2a, 1);
-    ground.fillRect(0, 490, W * 8, 30);
-    ground.fillStyle(0x00aa44, 1);
-    ground.fillRect(0, 488, W * 8, 4);
+    create() {
+        const W = this.scale.width, H = this.scale.height;
+        buildBg(this, W, H, 0x0a1520, 0x0d2010);
+        drawStars(this, W, H, 90);
 
-    // ── PLAYER ──────────────────────────────────────────────
-    player = this.physics.add.sprite(80, 460, 'flow');
-    player.setCollideWorldBounds(true);
-    player.setScale(3); // 32px → ~96px on screen
+        // Hero
+        const hero = this.add.sprite(W / 2, H * 0.36, 'flow').setScale(4);
+        registerAnims(this);
+        hero.play('happy');
+        this.tweens.add({ targets: hero, y: H * 0.36 - 14, duration: 1400, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
-    // ── ANIMATIONS ──────────────────────────────────────────
-    // Guard: only create if flow texture loaded successfully
-    if (this.textures.exists('flow')) {
-        this.anims.create({
-            key: 'idle',
-            frames: this.anims.generateFrameNumbers('flow', { start: 0, end: 3 }),
-            frameRate: 6,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'run',
-            frames: this.anims.generateFrameNumbers('flow', { start: 4, end: 7 }),
-            frameRate: 10,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'happy',
-            frames: this.anims.generateFrameNumbers('flow', { start: 8, end: 11 }),
-            frameRate: 8,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'low_energy',
-            frames: this.anims.generateFrameNumbers('flow', { start: 12, end: 15 }),
-            frameRate: 6,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'jump',
-            frames: this.anims.generateFrameNumbers('flow', { start: 16, end: 19 }),
-            frameRate: 8,
-            repeat: 0
-        });
+        // Title
+        this.add.text(W / 2, H * 0.60, 'FLOW:', {
+            fontFamily: 'monospace', fontSize: '34px', color: '#00ff41',
+            stroke: '#002211', strokeThickness: 5,
+        }).setOrigin(0.5);
 
-        player.play('run');
+        this.add.text(W / 2, H * 0.60 + 44, 'BLOOMFALL', {
+            fontFamily: 'monospace', fontSize: '22px', color: '#aaffcc',
+            stroke: '#002211', strokeThickness: 3,
+        }).setOrigin(0.5);
+
+        this.add.text(W / 2, H * 0.74, 'restore the bloom · tap to grow', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#446644',
+        }).setOrigin(0.5);
+
+        const hint = this.add.text(W / 2, H * 0.84, '— TAP TO BEGIN —', {
+            fontFamily: 'monospace', fontSize: '12px', color: '#00ff41',
+        }).setOrigin(0.5);
+        this.tweens.add({ targets: hint, alpha: 0.2, duration: 800, yoyo: true, repeat: -1 });
+
+        this.input.once('pointerdown', () => {
+            this.cameras.main.fade(400, 0, 0, 0);
+            this.time.delayedCall(400, () => {
+                this.scene.start('GameScene', { levelIndex: 0 });
+                this.scene.launch('UIScene');
+            });
+        });
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
+//  GAME SCENE
+// ═════════════════════════════════════════════════════════════
+class GameScene extends Phaser.Scene {
+    constructor() { super({ key: 'GameScene' }); }
+
+    init(data) {
+        this.levelIndex = data.levelIndex || 0;
+        this.ld         = window.FLOW_LEVELS[this.levelIndex];
     }
 
-    // ── CAMERA ──────────────────────────────────────────────
-    this.cameras.main.setBounds(0, 0, W * 8, H);
-    this.cameras.main.startFollow(player, true, 0.08, 0.08);
+    create() {
+        const ld = this.ld;
+        const W  = this.scale.width;
+        const H  = this.scale.height;
 
-    // ── LEVEL OBJECTS ────────────────────────────────────────
-    objects = [
-        createObj(this, 280,  460, 'grow'),
-        createObj(this, 500,  440, 'grow'),
-        createObj(this, 720,  460, 'water'),
-        createObj(this, 960,  430, 'grow'),
-        createObj(this, 1180, 460, 'water'),
-        createObj(this, 1420, 440, 'grow'),
-        createObj(this, 1680, 460, 'bloom'),
-    ];
+        // ── State ──────────────────────────────────────────────
+        this.energy    = ld.startEnergy;
+        this.maxEnergy = 100;
+        this.score     = 0;
+        this.ended     = false;
+        this.airborne  = false;
+        this.shownHints = new Set();
+        this.objects   = [];
 
-    // ── INPUT ────────────────────────────────────────────────
-    this.input.on('pointerdown', () => activateFlow(this));
+        // ── World ──────────────────────────────────────────────
+        this.physics.world.setBounds(0, 0, ld.worldLength, H);
 
-    // ── HUD (fixed to camera) ────────────────────────────────
-    // Energy bar background
-    energyBar = this.add.graphics().setScrollFactor(0).setDepth(10);
+        // ── Environment ────────────────────────────────────────
+        buildScrollingBg(this, ld, W, H);
+        buildPlatformGfx(this, ld);
 
-    // Labels
-    this.add.text(20, 16, 'ENERGY', {
-        fontFamily: 'monospace',
-        fontSize: '10px',
-        color: '#00ff41',
-        alpha: 0.7
-    }).setScrollFactor(0).setDepth(10);
+        // ── Objects ────────────────────────────────────────────
+        this.objects = spawnObjects(this, ld.objects);
 
-    scoreText = this.add.text(W - 20, 16, 'SCORE: 0', {
-        fontFamily: 'monospace',
-        fontSize: '10px',
-        color: '#00ff41',
-        alpha: 0.7
-    }).setScrollFactor(0).setDepth(10).setOrigin(1, 0);
+        // ── Particle texture (generated, no file needed) ───────
+        const pg = this.make.graphics({ x: 0, y: 0, add: false });
+        pg.fillStyle(0xffffff, 1);
+        pg.fillCircle(5, 5, 5);
+        pg.generateTexture('dot', 10, 10);
+        pg.destroy();
 
-    // Tap hint at bottom
-    const hint = this.add.text(W / 2, H - 30, 'TAP TO FLOW', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#00ff41',
-        alpha: 0.5
-    }).setScrollFactor(0).setDepth(10).setOrigin(0.5);
+        // ── Player ─────────────────────────────────────────────
+        this.player = this.physics.add.sprite(ld.playerStart.x, ld.playerStart.y, 'flow');
+        this.player.setScale(PLAYER_SCALE).setCollideWorldBounds(true).setDepth(10);
+        registerAnims(this);
+        this.player.play('run');
 
-    this.tweens.add({
-        targets: hint,
-        alpha: 0.15,
-        duration: 900,
-        yoyo: true,
-        repeat: -1
-    });
-}
+        // ── Camera ─────────────────────────────────────────────
+        this.cameras.main.setBounds(0, 0, ld.worldLength, H);
+        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+        this.cameras.main.fadeIn(500);
 
-// ── OBJECT FACTORY ───────────────────────────────────────────
-function createObj(scene, x, y, type) {
-    const colors = {
-        grow:  0x2a4a2a,
-        water: 0x1a2a4a,
-        bloom: 0x4a2a4a
-    };
-    const glows = {
-        grow:  0x00ff44,
-        water: 0x00aaff,
-        bloom: 0xff44ff
-    };
+        // ── Input ──────────────────────────────────────────────
+        this.input.on('pointerdown', () => this._activate());
 
-    // Dead version (dark block)
-    const dead = scene.add.rectangle(x, y, 44, 44, colors[type] || 0x333333)
-        .setStrokeStyle(1, glows[type] || 0x444444, 0.3);
+        // ── Notify UI ─────────────────────────────────────────
+        this.events.emit('levelStart', { name: ld.name, total: ld.objects.length });
+    }
 
-    // Alive version (hidden until activated)
-    const alive = scene.add.rectangle(x, y, 44, 44, glows[type] || 0x00ff44)
-        .setAlpha(0)
-        .setStrokeStyle(2, 0xffffff, 0.3);
-
-    // Type label
-    const labels = { grow: '🌱', water: '💧', bloom: '🌸' };
-    const label = scene.add.text(x, y, labels[type] || '?', {
-        fontSize: '18px'
-    }).setOrigin(0.5).setDepth(2);
-
-    return { x, y, type, active: false, dead, alive, label };
-}
-
-// ── FLOW ACTIVATION ──────────────────────────────────────────
-function activateFlow(scene) {
-    if (energy < 15 || gameEnded) return;
-
-    energy -= 15;
-
-    // Camera shake
-    scene.cameras.main.shake(80, 0.003);
-
-    // Player pulse
-    scene.tweens.add({
-        targets: player,
-        scaleX: 3.4, scaleY: 2.6,
-        duration: 80,
-        yoyo: true
-    });
-
-    // Sound
-    trySound(scene, 'tap');
-
-    // Find nearest unactivated object
-    let nearest = null;
-    let minDist = 160;
-
-    objects.forEach(obj => {
-        const dist = Math.abs(obj.x - player.x);
-        if (!obj.active && dist < minDist) {
-            nearest = obj;
-            minDist = dist;
+    update() {
+        if (!this.ended) {
+            this.player.setVelocityX(PLAYER_SPEED);
+        } else {
+            this.player.setVelocityX(0);
         }
-    });
 
-    if (!nearest) return;
-
-    nearest.active = true;
-    score += 100;
-
-    // Dead → alive transition
-    scene.tweens.add({
-        targets: nearest.dead,
-        alpha: 0,
-        duration: 300
-    });
-    scene.tweens.add({
-        targets: nearest.alive,
-        alpha: 0.85,
-        duration: 400
-    });
-
-    // Scale pop on alive tile
-    nearest.alive.setScale(0);
-    scene.tweens.add({
-        targets: nearest.alive,
-        scaleX: 1.2, scaleY: 1.2,
-        duration: 120,
-        ease: 'Back.Out',
-        onComplete: () => {
-            scene.tweens.add({ targets: nearest.alive, scaleX: 1, scaleY: 1, duration: 80 });
-        }
-    });
-
-    // Type-specific behaviour
-    if (nearest.type === 'grow') {
-        player.setVelocityY(-320);
-        if (scene.textures.exists('flow')) player.play('jump', true);
-        spawnParticles(scene, nearest.x, nearest.y, 0x00ff88, 8);
-        trySound(scene, 'grow');
-    }
-
-    if (nearest.type === 'water') {
-        // Ripple: brief horizontal speed boost
-        spawnParticles(scene, nearest.x, nearest.y, 0x00aaff, 10);
-        scene.cameras.main.flash(200, 0, 100, 180, false);
-        trySound(scene, 'grow');
-    }
-
-    if (nearest.type === 'bloom') {
-        triggerFinale(scene);
-    }
-}
-
-// ── PARTICLE BURST (Phaser 3.60 API) ─────────────────────────
-function spawnParticles(scene, x, y, color, count) {
-    // Tint the generic particle texture per burst
-    const emitter = scene.add.particles(x, y, 'particle', {
-        speed: { min: 40, max: 120 },
-        angle: { min: 0, max: 360 },
-        scale: { start: 1, end: 0 },
-        lifespan: 500,
-        quantity: count,
-        tint: color,
-        emitting: false
-    });
-    emitter.explode(count);
-
-    // Auto-destroy after particles die
-    scene.time.delayedCall(600, () => emitter.destroy());
-}
-
-// ── FINALE ───────────────────────────────────────────────────
-function triggerFinale(scene) {
-    gameEnded = true;
-
-    if (scene.textures.exists('flow')) player.play('happy');
-
-    scene.cameras.main.zoomTo(1.3, 1200, 'Sine.easeInOut');
-
-    trySound(scene, 'finale');
-
-    // Big particle celebration
-    spawnParticles(scene, player.x, player.y - 30, 0x00ff88, 25);
-    scene.time.delayedCall(300, () => spawnParticles(scene, player.x, player.y, 0xffdd00, 20));
-    scene.time.delayedCall(600, () => spawnParticles(scene, player.x, player.y - 20, 0xff44ff, 15));
-
-    // End card
-    const W = scene.scale.width;
-    const H = scene.scale.height;
-
-    const panel = scene.add.rectangle(W / 2, H / 2, 260, 120, 0x000000, 0.85)
-        .setScrollFactor(0)
-        .setDepth(20)
-        .setStrokeStyle(1, 0x00ff41, 0.6);
-
-    scene.add.text(W / 2, H / 2 - 24, 'BLOOM RESTORED!', {
-        fontFamily: 'monospace',
-        fontSize: '18px',
-        color: '#00ff41',
-        align: 'center'
-    }).setScrollFactor(0).setDepth(21).setOrigin(0.5);
-
-    scene.add.text(W / 2, H / 2 + 4, 'WELL FLOW\'N 🌿', {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: '#aaffcc',
-        align: 'center'
-    }).setScrollFactor(0).setDepth(21).setOrigin(0.5);
-
-    scene.add.text(W / 2, H / 2 + 26, `SCORE: ${score}`, {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#00ff41',
-        alpha: 0.7
-    }).setScrollFactor(0).setDepth(21).setOrigin(0.5);
-
-    // Tap to restart
-    const restart = scene.add.text(W / 2, H / 2 + 52, '[ TAP TO REPLAY ]', {
-        fontFamily: 'monospace',
-        fontSize: '10px',
-        color: '#00ff41',
-        alpha: 0.5
-    }).setScrollFactor(0).setDepth(21).setOrigin(0.5);
-
-    scene.tweens.add({ targets: restart, alpha: 0.15, duration: 700, yoyo: true, repeat: -1 });
-
-    scene.input.once('pointerdown', () => {
-        scene.cameras.main.zoomTo(1, 300);
-        scene.scene.restart();
-        // Reset globals
-        energy = 100;
-        gameEnded = false;
-        score = 0;
-        objects = [];
-    });
-}
-
-// ── SOUND HELPER (graceful — won't crash if file missing) ─────
-function trySound(scene, key) {
-    try {
-        if (scene.cache.audio.exists(key)) {
-            scene.sound.play(key, { volume: 0.4 });
-        }
-    } catch (e) { /* silence */ }
-}
-
-// ── UPDATE ───────────────────────────────────────────────────
-function update() {
-    if (!gameEnded) {
-        player.setVelocityX(90);
-    } else {
-        player.setVelocityX(0);
-    }
-
-    // Simple ground clamp
-    if (player.y >= 460) {
-        player.setY(460);
-        player.setVelocityY(0);
-
-        // Landing — resume run/idle anim
-        if (this.textures && this.textures.exists('flow') && !gameEnded) {
-            if (energy < 20) {
-                player.play('low_energy', true);
-            } else if (energy < 50) {
-                player.play('idle', true);
-            } else {
-                player.play('run', true);
+        // Ground clamp + landing
+        if (this.player.y >= GROUND_Y) {
+            this.player.setY(GROUND_Y);
+            if (this.player.body.velocity.y > 0) this.player.setVelocityY(0);
+            if (this.airborne) {
+                this.airborne = false;
+                this.player.play('land', true);
+                this.time.delayedCall(220, () => this._syncAnim());
             }
         }
+
+        // Regen
+        if (this.energy < this.maxEnergy) this.energy = Math.min(this.maxEnergy, this.energy + 0.12);
+
+        // Proximity hints
+        this.objects.forEach(obj => {
+            if (obj.active || !obj.hintText || this.shownHints.has(obj.id)) return;
+            if (Math.abs(obj.x - this.player.x) < 210) {
+                this.shownHints.add(obj.id);
+                this.tweens.add({ targets: obj.hintText, alpha: 1, duration: 300 });
+                this.time.delayedCall(2200, () => {
+                    if (obj.hintText?.active) this.tweens.add({ targets: obj.hintText, alpha: 0, duration: 400 });
+                });
+            }
+        });
+
+        // Emit to UIScene
+        this.events.emit('stateUpdate', {
+            energy:    this.energy,
+            maxEnergy: this.maxEnergy,
+            score:     this.score,
+            done:      this.objects.filter(o => o.active).length,
+            total:     this.objects.length,
+        });
     }
 
-    // Energy regen
-    if (energy < maxEnergy) energy += 0.1;
+    _activate() {
+        if (this.energy < ENERGY_COST || this.ended) return;
+        this.energy -= ENERGY_COST;
 
-    // Score text update
-    if (scoreText) scoreText.setText(`SCORE: ${score}`);
+        this.cameras.main.shake(85, 0.003);
+        playerPulse(this, this.player, PLAYER_SCALE);
+        trySound(this, 'tap');
 
-    drawHUD();
+        // Find nearest inactive object within range
+        let nearest = null, minDist = 185;
+        this.objects.forEach(obj => {
+            const d = Math.abs(obj.x - this.player.x);
+            if (!obj.active && d < minDist) { nearest = obj; minDist = d; }
+        });
+        if (!nearest) return;
+
+        nearest.active = true;
+        this.score += nearest.scoreValue;
+        activateObj(this, nearest);
+
+        switch (nearest.type) {
+            case 'grow':
+                this.player.setVelocityY(JUMP_VEL);
+                this.airborne = true;
+                this.player.play('jump', true);
+                trySound(this, 'grow');
+                break;
+            case 'water':
+                this.cameras.main.flash(260, 0, 80, 160, false);
+                trySound(this, 'grow');
+                break;
+            case 'bloom':
+                this.time.delayedCall(250, () => this._win());
+                break;
+        }
+    }
+
+    _win() {
+        this.ended = true;
+        this.player.play('happy');
+        trySound(this, 'finale');
+        this.cameras.main.zoomTo(1.25, 1200, 'Sine.easeInOut');
+
+        burst(this, this.player.x, this.player.y - 20, C.bloom.particle, 28);
+        this.time.delayedCall(300, () => burst(this, this.player.x, this.player.y, C.grow.particle, 20));
+        this.time.delayedCall(600, () => burst(this, this.player.x, this.player.y - 30, C.water.particle, 16));
+
+        this.time.delayedCall(1500, () => {
+            this.cameras.main.fade(600, 0, 0, 0);
+            this.time.delayedCall(600, () => {
+                this.scene.stop('UIScene');
+                this.scene.start('WinScene', {
+                    score: this.score, levelIndex: this.levelIndex, levelName: this.ld.name,
+                });
+            });
+        });
+    }
+
+    _syncAnim() {
+        if (this.ended || this.airborne) return;
+        if      (this.energy < 25) this.player.play('low_energy', true);
+        else if (this.energy < 55) this.player.play('idle', true);
+        else                       this.player.play('run', true);
+    }
 }
 
-// ── HUD ──────────────────────────────────────────────────────
-function drawHUD() {
-    if (!energyBar) return;
+// ═════════════════════════════════════════════════════════════
+//  UI SCENE  (parallel HUD — launched alongside GameScene)
+// ═════════════════════════════════════════════════════════════
+class UIScene extends Phaser.Scene {
+    constructor() { super({ key: 'UIScene' }); }
 
-    const barX = 20;
-    const barY = 28;
-    const barW = 140;
-    const barH = 6;
-    const ratio = energy / maxEnergy;
+    create() {
+        const W = this.scale.width;
 
-    energyBar.clear();
+        this.bar       = this.add.graphics();
+        this.scoreText = this.add.text(W - 16, 14, 'SCORE: 0', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#00ff41',
+        }).setOrigin(1, 0);
+        this.flowText  = this.add.text(16, 14, '', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#00ff41',
+        });
 
-    // Track
-    energyBar.fillStyle(0x1a1a1a, 1);
-    energyBar.fillRoundedRect(barX, barY, barW, barH, 3);
+        const tap = this.add.text(W / 2, 616, 'TAP TO FLOW', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#00ff41',
+        }).setOrigin(0.5).setAlpha(0.4);
+        this.tweens.add({ targets: tap, alpha: 0.12, duration: 900, yoyo: true, repeat: -1 });
 
-    // Border
-    energyBar.lineStyle(1, 0x00ff41, 0.25);
-    energyBar.strokeRoundedRect(barX, barY, barW, barH, 3);
+        const game = this.scene.get('GameScene');
+        game.events.on('stateUpdate', d => {
+            this._drawBar(d.energy, d.maxEnergy);
+            this.scoreText.setText(`SCORE: ${d.score}`);
+            this.flowText.setText(`🌿 ${d.done}/${d.total}`);
+        });
+        game.events.on('levelStart', d => this._banner(d.name));
+    }
 
-    // Fill — color shifts red when low
-    const fillColor = ratio < 0.3
-        ? Phaser.Display.Color.GetColor(255, Math.floor(ratio * 3 * 180), 0)
-        : Phaser.Display.Color.GetColor(0, 220, 80);
+    _drawBar(energy, max) {
+        const bx = 16, by = 28, bw = 130, bh = 6, ratio = energy / max;
+        this.bar.clear();
+        this.bar.fillStyle(0x111111, 0.9);
+        this.bar.fillRoundedRect(bx - 1, by - 1, bw + 2, bh + 2, 3);
+        this.bar.fillStyle(0x1a1a1a, 1);
+        this.bar.fillRoundedRect(bx, by, bw, bh, 3);
+        const col = ratio < 0.3
+            ? Phaser.Display.Color.GetColor(220, Math.floor(ratio * 3 * 120), 0)
+            : Phaser.Display.Color.GetColor(0, 200, 65);
+        this.bar.fillStyle(col, 1);
+        if (ratio > 0.01) this.bar.fillRoundedRect(bx, by, bw * ratio, bh, 3);
+        if (ratio > 0.85) {
+            this.bar.lineStyle(1, 0x00ff41, 0.4);
+            this.bar.strokeRoundedRect(bx, by, bw, bh, 3);
+        }
+    }
 
-    energyBar.fillStyle(fillColor, 1);
-    energyBar.fillRoundedRect(barX, barY, barW * ratio, barH, 3);
+    _banner(name) {
+        const W = this.scale.width;
+        const t = this.add.text(W / 2, 88, `LEVEL: ${name}`, {
+            fontFamily: 'monospace', fontSize: '13px',
+            color: '#00ff41', stroke: '#001100', strokeThickness: 3,
+        }).setOrigin(0.5).setAlpha(0);
+        this.tweens.add({ targets: t, alpha: 1, duration: 400 });
+        this.time.delayedCall(2200, () => {
+            this.tweens.add({ targets: t, alpha: 0, duration: 500, onComplete: () => t.destroy() });
+        });
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
+//  WIN SCENE
+// ═════════════════════════════════════════════════════════════
+class WinScene extends Phaser.Scene {
+    constructor() { super({ key: 'WinScene' }); }
+
+    init(data) {
+        this.finalScore  = data.score      || 0;
+        this.levelIndex  = data.levelIndex || 0;
+        this.levelName   = data.levelName  || '';
+    }
+
+    create() {
+        const W = this.scale.width, H = this.scale.height;
+        buildBg(this, W, H, 0x050f05, 0x0a200a);
+        drawStars(this, W, H, 70);
+
+        // Particle texture
+        const pg = this.make.graphics({ x: 0, y: 0, add: false });
+        pg.fillStyle(0xffffff, 1);
+        pg.fillCircle(5, 5, 5);
+        pg.generateTexture('dot', 10, 10);
+        pg.destroy();
+
+        const hero = this.add.sprite(W / 2, H * 0.28, 'flow').setScale(4);
+        registerAnims(this);
+        hero.play('happy');
+        this.tweens.add({ targets: hero, y: H * 0.28 - 14, duration: 1200, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+
+        this.time.delayedCall(200, () => {
+            burst(this, W * 0.28, H * 0.55, C.grow.particle,  16);
+            burst(this, W * 0.72, H * 0.45, C.water.particle, 16);
+            burst(this, W * 0.50, H * 0.65, C.bloom.particle, 16);
+        });
+
+        this.add.text(W / 2, H * 0.50, 'BLOOM RESTORED!', {
+            fontFamily: 'monospace', fontSize: '22px',
+            color: '#00ff41', stroke: '#002200', strokeThickness: 4,
+        }).setOrigin(0.5);
+
+        this.add.text(W / 2, H * 0.50 + 38, "WELL FLOW'N 🌿", {
+            fontFamily: 'monospace', fontSize: '14px', color: '#aaffcc',
+        }).setOrigin(0.5);
+
+        this.add.text(W / 2, H * 0.50 + 66, `SCORE: ${this.finalScore}`, {
+            fontFamily: 'monospace', fontSize: '12px', color: '#00ff41', alpha: 0.8,
+        }).setOrigin(0.5);
+
+        const hasNext  = Boolean(window.FLOW_LEVELS[this.levelIndex + 1]);
+        const nextIdx  = hasNext ? this.levelIndex + 1 : 0;
+        const btnLabel = hasNext ? '[ NEXT LEVEL ]' : '[ PLAY AGAIN ]';
+
+        const btn = this.add.text(W / 2, H * 0.76, btnLabel, {
+            fontFamily: 'monospace', fontSize: '14px',
+            color: '#00ff41', stroke: '#001100', strokeThickness: 3,
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        this.tweens.add({ targets: btn, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
+        btn.on('pointerdown', () => {
+            this.cameras.main.fade(400, 0, 0, 0);
+            this.time.delayedCall(400, () => {
+                this.scene.start('GameScene', { levelIndex: nextIdx });
+                this.scene.launch('UIScene');
+            });
+        });
+
+        const menu = this.add.text(W / 2, H * 0.83, '[ MAIN MENU ]', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#446644',
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        menu.on('pointerdown', () => {
+            this.cameras.main.fade(400, 0, 0, 0);
+            this.time.delayedCall(400, () => this.scene.start('MenuScene'));
+        });
+
+        this.cameras.main.fadeIn(600);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
+//  SHARED HELPERS
+// ═════════════════════════════════════════════════════════════
+
+function buildBg(scene, W, H, topHex, botHex) {
+    const bg = scene.add.graphics();
+    bg.fillGradientStyle(topHex, topHex, botHex, botHex, 1);
+    bg.fillRect(0, 0, W, H);
+}
+
+function drawStars(scene, W, H, count) {
+    const g = scene.add.graphics();
+    for (let i = 0; i < count; i++) {
+        g.fillStyle(0xffffff, Phaser.Math.FloatBetween(0.08, 0.50));
+        g.fillCircle(
+            Phaser.Math.Between(0, W),
+            Phaser.Math.Between(0, H * 0.72),
+            Phaser.Math.FloatBetween(0.4, 1.4)
+        );
+    }
+    // Twinkle a handful
+    const spots = Array.from({ length: 7 }, () => {
+        const d = scene.add.graphics();
+        d.fillStyle(0xffffff, 0.55);
+        d.fillCircle(Phaser.Math.Between(10, W - 10), Phaser.Math.Between(10, H * 0.55), 1.3);
+        return d;
+    });
+    scene.tweens.add({
+        targets: spots, alpha: 0.08,
+        duration: Phaser.Math.Between(900, 2200),
+        yoyo: true, repeat: -1,
+        delay: (_, i) => i * 280,
+    });
+}
+
+function buildScrollingBg(scene, ld, W, H) {
+    const LW = ld.worldLength;
+    const topCol = parseInt(ld.bgGradientTop.slice(1), 16);
+    const botCol = parseInt(ld.bgGradientBottom.slice(1), 16);
+
+    // Sky
+    const sky = scene.add.graphics();
+    sky.fillGradientStyle(topCol, topCol, botCol, botCol, 1);
+    sky.fillRect(0, 0, LW, H);
+
+    // Distant mountains — parallax 0.3
+    const mtn = scene.add.graphics().setScrollFactor(0.3);
+    mtn.fillStyle(0x0a1a0a, 0.55);
+    for (let i = 0; i < Math.ceil(LW / 200) + 2; i++) {
+        const mx = i * 200 + Phaser.Math.Between(-20, 20);
+        const mh = Phaser.Math.Between(70, 150);
+        mtn.fillTriangle(mx, H - 96, mx + 88, H - 96 - mh, mx + 176, H - 96);
+    }
+
+    // Mid clouds — parallax 0.55
+    const cld = scene.add.graphics().setScrollFactor(0.55);
+    cld.fillStyle(0x1a3a2a, 0.28);
+    for (let i = 0; i < Math.ceil(LW / 280) + 2; i++) {
+        const cx = i * 280 + Phaser.Math.Between(0, 80);
+        const cy = Phaser.Math.Between(70, 190);
+        cld.fillEllipse(cx, cy, 180, 48);
+        cld.fillEllipse(cx + 55, cy - 18, 110, 36);
+    }
+
+    // Ground base
+    const gnd = scene.add.graphics();
+    gnd.fillStyle(0x091509, 1);
+    gnd.fillRect(0, 478, LW, H - 478);
+    gnd.fillStyle(0x003311, 1);
+    gnd.fillRect(0, 476, LW, 4);
+
+    // Background stars (fixed to camera)
+    drawStars(scene, W, H * 0.5, 55);
+}
+
+function buildPlatformGfx(scene, ld) {
+    const g = scene.add.graphics().setDepth(2);
+
+    ld.platforms.forEach(p => {
+        if (p.type === 'gap') return;
+        const y   = (p.y || 480) + (p.elevated ? -20 : 0);
+        const col = { dead: 0x181818, water: 0x0d1e38, crystal: 0x180a2c }[p.type] || 0x181818;
+        const top = { dead: 0x2e2e2e, water: 0x004488, crystal: 0x551188 }[p.type] || 0x2e2e2e;
+
+        g.fillStyle(col, 1);  g.fillRect(p.x, y, p.w, 22);
+        g.fillStyle(top, 1);  g.fillRect(p.x, y - 3, p.w, 4);
+
+        // Pixel notches
+        g.fillStyle(0x000000, 0.35);
+        for (let nx = p.x + 18; nx < p.x + p.w - 8; nx += 30) g.fillRect(nx, y, 2, 7);
+    });
+}
+
+function spawnObjects(scene, defs) {
+    return defs.map(def => {
+        const col = C[def.type] || C.grow;
+
+        const dead = scene.add.rectangle(def.x, def.y, 46, 46, col.dead)
+            .setStrokeStyle(1, col.glow, 0.22).setDepth(5);
+
+        const deadIcon = scene.add.text(def.x, def.y, def.label, { fontSize: '18px', alpha: 0.3 })
+            .setOrigin(0.5).setDepth(6);
+
+        const alive = scene.add.rectangle(def.x, def.y, 46, 46, col.alive)
+            .setAlpha(0).setStrokeStyle(2, 0xffffff, 0.2).setDepth(5);
+
+        const aliveIcon = scene.add.text(def.x, def.y, def.label, { fontSize: '20px' })
+            .setOrigin(0.5).setAlpha(0).setDepth(7);
+
+        const ring = scene.add.graphics().setDepth(4);
+        ring.lineStyle(2, col.glow, 0.16);
+        ring.strokeCircle(def.x, def.y, 30);
+
+        let hintText = null;
+        if (def.hint) {
+            hintText = scene.add.text(def.x, def.y - 44, def.hint, {
+                fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
+                backgroundColor: '#00000099', padding: { x: 6, y: 3 },
+            }).setOrigin(0.5).setAlpha(0).setDepth(15);
+        }
+
+        // Idle bob
+        scene.tweens.add({
+            targets: [dead, deadIcon], y: def.y - 5,
+            duration: 1100 + Phaser.Math.Between(0, 500),
+            ease: 'Sine.easeInOut', yoyo: true, repeat: -1,
+        });
+
+        return { ...def, active: false, dead, deadIcon, alive, aliveIcon, ring, hintText, hintVisible: false };
+    });
+}
+
+function activateObj(scene, obj) {
+    const col = C[obj.type] || C.grow;
+
+    scene.tweens.killTweensOf([obj.dead, obj.deadIcon]);
+    scene.tweens.add({ targets: [obj.dead, obj.deadIcon], alpha: 0, duration: 220 });
+
+    obj.alive.setScale(0);
+    obj.aliveIcon.setScale(0);
+    scene.tweens.add({
+        targets: [obj.alive, obj.aliveIcon],
+        alpha: 1, scaleX: 1, scaleY: 1,
+        duration: 200, ease: 'Back.Out',
+    });
+
+    obj.ring.clear();
+    obj.ring.lineStyle(2, col.glow, 0.65);
+    obj.ring.strokeCircle(obj.x, obj.y, 30);
+    scene.tweens.add({ targets: obj.ring, alpha: 0, duration: 550 });
+
+    burst(scene, obj.x, obj.y, col.particle, 12);
+
+    // Score pop
+    const pop = scene.add.text(obj.x, obj.y - 28, `+${obj.scoreValue}`, {
+        fontFamily: 'monospace', fontSize: '11px',
+        color: '#ffffff', stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(20);
+    scene.tweens.add({
+        targets: pop, y: obj.y - 62, alpha: 0, duration: 680, ease: 'Quad.Out',
+        onComplete: () => pop.destroy(),
+    });
+
+    // Alive pulse
+    scene.tweens.add({
+        targets: obj.alive, alpha: 0.6, duration: 950,
+        ease: 'Sine.easeInOut', yoyo: true, repeat: -1, delay: 180,
+    });
+}
+
+/** Particle burst — Phaser 3.60 API */
+function burst(scene, x, y, tint, count) {
+    const key = scene.textures.exists('dot') ? 'dot' : 'particle';
+    try {
+        const e = scene.add.particles(x, y, key, {
+            speed: { min: 50, max: 170 }, angle: { min: 0, max: 360 },
+            scale: { start: 1.1, end: 0 }, lifespan: 560,
+            quantity: count, tint, emitting: false,
+        });
+        e.explode(count);
+        scene.time.delayedCall(700, () => { if (e?.active) e.destroy(); });
+    } catch (_) { /* graceful */ }
+}
+
+function playerPulse(scene, player, base) {
+    scene.tweens.add({
+        targets: player, scaleX: base * 1.18, scaleY: base * 0.84,
+        duration: 75, yoyo: true, ease: 'Quad.Out',
+    });
+}
+
+function registerAnims(scene) {
+    Object.entries(ANIM_DEFS).forEach(([key, d]) => {
+        if (scene.anims.exists(key)) return;
+        scene.anims.create({
+            key,
+            frames:    scene.anims.generateFrameNumbers('flow', { start: d.start, end: d.end }),
+            frameRate: d.rate,
+            repeat:    d.loop ? -1 : 0,
+        });
+    });
+}
+
+function trySound(scene, key) {
+    try { if (scene.cache.audio.exists(key)) scene.sound.play(key, { volume: 0.38 }); }
+    catch (_) { /* silent */ }
 }
