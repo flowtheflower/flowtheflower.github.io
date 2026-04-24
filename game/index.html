@@ -7,7 +7,14 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #050505; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        body { 
+            background: #050505; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            overflow: hidden; /* Prevent scrollbars during jitters */
+        }
         #back-btn {
             position: fixed; top: 14px; left: 14px; z-index: 9999;
             background: none; border: 1px solid rgba(0,255,65,0.35);
@@ -17,7 +24,13 @@
             transition: border-color 0.2s, background 0.2s;
         }
         #back-btn:hover { border-color: #00ff41; background: rgba(0,255,65,0.06); }
-        canvas { display: block; }
+        
+        /* Ensure the canvas doesn't blur on resize */
+        canvas { 
+            display: block; 
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
     </style>
 </head>
 <body>
