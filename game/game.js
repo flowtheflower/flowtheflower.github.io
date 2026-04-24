@@ -13,8 +13,8 @@
  */
 
 // ── SPRITE ────────────────────────────────────────────────────
-var SPR_W  = 110;
-var SPR_H  = 88;
+var SPR_W  = 96;
+var SPR_H  = 76;
 var P_SCALE = 1.3;   // 99*1.3 ≈ 129px wide, 88*1.3 ≈ 114px tall — right-sized character
 
 var ANIMS = [
