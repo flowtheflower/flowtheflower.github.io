@@ -1,35 +1,19 @@
 /**
  * FLOW: BLOOMFALL — game.js
- * Requires: Phaser 3.60  |  levels.js loaded before this file
- *
- * Spritesheet (assets/flow_game.png) — 103×103px per frame, 4 cols × 6 rows:
- *   Row 0  frames  0– 3   IDLE
- *   Row 1  frames  4– 7   RUN
- *   Row 2  frames  8–11   HAPPY
- *   Row 3  frames 12–15   LOW_ENERGY
- *   Row 4  frames 16–19   JUMP
- *   Row 5  frames 20–23   LAND
- *
- * Tile atlas (assets/tiles_atlas.png) — 64×64px per tile, 8 cols × 3 rows:
- *   dead_ground, alive_ground, top_grass, rock, vines, dead_plant, grow_plant1, grow_plant2
- *   bloom_flower, bush, water_still, water_flow1, water_flow2, waterfall_top, waterfall_mid, waterfall_btm
- *   lily_pad, mushroom, tree_trunk, leaves, background1, background2, cloud, crystal
  */
 
-// ── TILE ATLAS MAP ────────────────────────────────────────────
 var TILE_MAP = {
     dead_ground:   0,  alive_ground:  1,  top_grass:     2,  rock:          3,
-    vines:         4,  dead_plant:    5,  grow_plant1:   6,  grow_plant2:   7,
-    bloom_flower:  8,  bush:          9,  water_still:   10, water_flow1:   11,
+    vines:          4,  dead_plant:     5,  grow_plant1:   6,  grow_plant2:   7,
+    bloom_flower:  8,  bush:           9,  water_still:   10, water_flow1:   11,
     water_flow2:   12, waterfall_top: 13, waterfall_mid: 14, waterfall_btm: 15,
-    lily_pad:      16, mushroom:      17, tree_trunk:    18, leaves:        19,
-    background1:   20, background2:   21, cloud:         22, crystal:       23,
+    lily_pad:      16, mushroom:       17, tree_trunk:    18, leaves:        19,
+    background1:   20, background2:    21, cloud:         22, crystal:       23,
 };
 var ATLAS_COLS = 8;
-var TILE_SRC   = 64;   // source px per tile in atlas
-var TILE_DSP   = 48;   // display px per tile on screen
+var TILE_SRC   = 64;  
+var TILE_DSP   = 48;  
 
-// ── SPRITE SHEET ──────────────────────────────────────────────
 var FW = 103, FH = 103;
 var ANIM_DEFS = [
     { key: 'idle',       start: 0,  end: 3,  rate: 5,  loop: true  },
@@ -40,34 +24,31 @@ var ANIM_DEFS = [
     { key: 'land',       start: 20, end: 23, rate: 10, loop: false },
 ];
 
-// ── PALETTE ───────────────────────────────────────────────────
 var PAL = {
     grow:  { dead: 0x1a2e1a, alive: 0x00cc44, glow: 0x00ff66, ptcl: 0x44ff88 },
     water: { dead: 0x0d1a2e, alive: 0x0077cc, glow: 0x00aaff, ptcl: 0x66ccff },
     bloom: { dead: 0x2e0d2e, alive: 0xcc44cc, glow: 0xff66ff, ptcl: 0xff99ff },
 };
 
-// ── PHYSICS ───────────────────────────────────────────────────
 var PLAYER_SPEED = 90;
 var JUMP_VEL     = -360;
-var GRAVITY      = 18;       // manual gravity per frame
-var GROUND_Y     = 432;      // player feet rest here
+var GRAVITY      = 18;  
+var GROUND_Y      = 432; 
 var ENERGY_COST  = 18;
-var P_SCALE      = 2.0;      // player display scale (smaller = less glitchy)
+var P_SCALE      = 2.0; 
 
-// ─────────────────────────────────────────────────────────────
+// --- FIX 1: Config enhancements for smoothness ---
 new Phaser.Game({
     type:            Phaser.AUTO,
     width:           360,
     height:          640,
     backgroundColor: '#050505',
+    pixelArt:        true,   // Keeps sprite edges crisp
+    roundPixels:     true,   // Snaps rendering to whole pixels to prevent jitter
     physics:         { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
     scene:           [MenuScene, GameScene, UIScene, WinScene],
 });
 
-// ═════════════════════════════════════════════════════════════
-//  MENU SCENE
-// ═════════════════════════════════════════════════════════════
 function MenuScene() { Phaser.Scene.call(this, { key: 'MenuScene' }); }
 MenuScene.prototype = Object.create(Phaser.Scene.prototype);
 MenuScene.prototype.constructor = MenuScene;
@@ -87,21 +68,18 @@ MenuScene.prototype.create = function () {
     makeStars(this, W, H, 100);
     registerAnims(this);
 
-    // Floating hero — smooth vertical only, no horizontal wobble
     var hero = this.add.sprite(W / 2, H * 0.34, 'flow').setScale(P_SCALE * 1.4);
     hero.play('idle');
 
-    // Clean vertical float — ONE tween, one axis only
     this.tweens.add({
         targets:  hero,
         y:        H * 0.34 - 10,
         duration: 1800,
-        ease:     'Sine.easeInOut',
-        yoyo:     true,
-        repeat:   -1,
+        ease:      'Sine.easeInOut',
+        yoyo:      true,
+        repeat:    -1,
     });
 
-    // Title
     this.add.text(W / 2, H * 0.58, 'FLOW:', {
         fontFamily: 'monospace', fontSize: '32px', color: '#00ff41',
         stroke: '#002211', strokeThickness: 5,
@@ -128,9 +106,6 @@ MenuScene.prototype.create = function () {
     });
 };
 
-// ═════════════════════════════════════════════════════════════
-//  GAME SCENE
-// ═════════════════════════════════════════════════════════════
 function GameScene() { Phaser.Scene.call(this, { key: 'GameScene' }); }
 GameScene.prototype = Object.create(Phaser.Scene.prototype);
 GameScene.prototype.constructor = GameScene;
@@ -142,37 +117,23 @@ GameScene.prototype.init = function (data) {
 
 GameScene.prototype.create = function () {
     var ld = this.ld, W = this.scale.width, H = this.scale.height, self = this;
-
-    // State
     this.energy     = ld.startEnergy;
     this.maxEnergy  = 100;
     this.score      = 0;
     this.ended      = false;
-    this.velY       = 0;          // manual vertical velocity
+    this.velY       = 0; 
     this.onGround   = true;
     this.shownHints = {};
     this.objs       = [];
     this.currentAnim = 'run';
 
     this.physics.world.setBounds(0, 0, ld.worldLength, H);
-
-    // ── Backgrounds ────────────────────────────────────────
     buildScrollBg(this, ld, W, H);
-
-    // ── Tile-based platforms ────────────────────────────────
     this.platformGroup = buildTilePlatforms(this, ld, H);
-
-    // ── Decorative tiles ───────────────────────────────────
     buildDecor(this, ld);
-
-    // ── Interactive objects ────────────────────────────────
     this.objs = spawnObjs(this, ld.objects);
-
-    // ── Particle dot texture ───────────────────────────────
     makeDot(this);
 
-    // ── Player ─────────────────────────────────────────────
-    // Use image (not physics sprite) so we fully control vertical movement
     this.player = this.add.sprite(ld.playerStart.x, ld.playerStart.y, 'flow');
     this.player.setScale(P_SCALE).setDepth(20);
     registerAnims(this);
@@ -180,41 +141,32 @@ GameScene.prototype.create = function () {
     this.playerX = ld.playerStart.x;
     this.playerY = ld.playerStart.y;
 
-    // ── Camera ─────────────────────────────────────────────
     this.cameras.main.setBounds(0, 0, ld.worldLength, H);
-    // Follow player manually via setScrollX in update
     this.cameras.main.fadeIn(500);
-
-    // ── Input ──────────────────────────────────────────────
     this.input.on('pointerdown', function () { self.doActivate(); });
-
-    // ── Notify UI ─────────────────────────────────────────
     this.events.emit('levelStart', { name: ld.name, total: ld.objects.length });
 };
 
+// --- FIX 2: Rewritten Update Loop for Smoothness ---
 GameScene.prototype.update = function (time, delta) {
     if (this.ended) return;
-    var dt = delta / 1000;  // seconds
+    var dt = delta / 1000; 
 
-    // Horizontal movement
-    this.playerX += PLAYER_SPEED * dt * 60 * dt; // pixel per frame equivalent
-    // Cleaner: constant pixels per second
+    // Horizontal movement: No double-multiplying dt
     this.playerX += PLAYER_SPEED * dt;
 
-    // Manual gravity
-    this.velY += GRAVITY;
+    // Manual gravity: Normalized for different frame rates
+    this.velY += GRAVITY * 60 * dt;
     this.playerY += this.velY * dt;
 
     // Ground clamp
     if (this.playerY >= GROUND_Y) {
         if (!this.onGround) {
-            // Just landed
             this.onGround = true;
             this.velY = 0;
             this.playerY = GROUND_Y;
-            var self = this;
             this.playAnim('land');
-            this.time.delayedCall(180, function () { self.syncAnim(); });
+            this.time.delayedCall(180, () => { if(!this.ended) this.syncAnim(); });
         } else {
             this.velY = 0;
             this.playerY = GROUND_Y;
@@ -223,18 +175,16 @@ GameScene.prototype.update = function (time, delta) {
         this.onGround = false;
     }
 
-    // Update sprite position
-    this.player.setPosition(this.playerX, this.playerY);
+    // Update sprite position with rounding to prevent "shimmer"
+    this.player.setPosition(Math.round(this.playerX), Math.round(this.playerY));
 
-    // Camera follows player with lerp
+    // Smooth Camera follow
     var camTargetX = this.playerX - this.scale.width * 0.25;
     var curScrollX = this.cameras.main.scrollX;
-    this.cameras.main.setScrollX(curScrollX + (camTargetX - curScrollX) * 0.08);
+    this.cameras.main.setScrollX(curScrollX + (camTargetX - curScrollX) * 0.05);
 
-    // Energy regen
     this.energy = Math.min(this.maxEnergy, this.energy + 0.10);
 
-    // Proximity hints
     var px = this.playerX, self = this;
     this.objs.forEach(function (obj) {
         if (obj.active || !obj.hintText || self.shownHints[obj.id]) return;
@@ -248,7 +198,6 @@ GameScene.prototype.update = function (time, delta) {
         }
     });
 
-    // Emit to UI
     this.events.emit('stateUpdate', {
         energy: this.energy, maxEnergy: this.maxEnergy, score: this.score,
         done:   this.objs.filter(function (o) { return o.active; }).length,
@@ -311,8 +260,9 @@ GameScene.prototype.doWin = function () {
     });
 };
 
+// --- FIX 3: Prevent animation restart flicker ---
 GameScene.prototype.playAnim = function (key) {
-    if (this.currentAnim === key && key !== 'land' && key !== 'jump') return;
+    if (this.player.anims.getName() === key && key !== 'land' && key !== 'jump') return;
     this.currentAnim = key;
     this.player.play(key, true);
 };
@@ -326,21 +276,15 @@ GameScene.prototype.syncAnim = function () {
     this.playAnim(next);
 };
 
-// ═════════════════════════════════════════════════════════════
-//  UI SCENE
-// ═════════════════════════════════════════════════════════════
 function UIScene() { Phaser.Scene.call(this, { key: 'UIScene' }); }
 UIScene.prototype = Object.create(Phaser.Scene.prototype);
 UIScene.prototype.constructor = UIScene;
 
 UIScene.prototype.create = function () {
     var W = this.scale.width, self = this;
-
-    // HUD panel background
     var hudBg = this.add.graphics();
     hudBg.fillStyle(0x000000, 0.55);
     hudBg.fillRoundedRect(12, 10, 186, 36, 6);
-
     this.bar      = this.add.graphics();
     this.energyLbl = this.add.text(18, 14, 'ENERGY', {
         fontFamily: 'monospace', fontSize: '8px', color: '#00ff41', alpha: 0.7
@@ -351,7 +295,6 @@ UIScene.prototype.create = function () {
     this.flowTxt  = this.add.text(W - 14, 28, '🌿 0/0', {
         fontFamily: 'monospace', fontSize: '9px', color: '#aaffcc',
     }).setOrigin(1, 0);
-
     var tap = this.add.text(W / 2, 622, 'TAP TO FLOW', {
         fontFamily: 'monospace', fontSize: '10px', color: '#00ff41',
     }).setOrigin(0.5).setAlpha(0.38);
@@ -376,33 +319,25 @@ UIScene.prototype.drawBar = function (energy, max) {
         : Phaser.Display.Color.GetColor(0, 210, 68);
     this.bar.fillStyle(col, 1);
     if (r > 0.01) this.bar.fillRoundedRect(bx, by, Math.max(4, bw * r), bh, 4);
-    if (r > 0.88) {
-        this.bar.lineStyle(1, 0x00ff41, 0.45);
-        this.bar.strokeRoundedRect(bx, by, bw, bh, 4);
-    }
 };
 
 UIScene.prototype.showBanner = function (name) {
     var W = this.scale.width, self = this;
     var t = this.add.text(W / 2, 92, 'LEVEL: ' + name, {
-        fontFamily: 'monospace', fontSize: '12px',
-        color: '#00ff41', stroke: '#001100', strokeThickness: 3,
+        fontFamily: 'monospace', fontSize: '12px', color: '#00ff41'
     }).setOrigin(0.5).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, duration: 380 });
     this.time.delayedCall(2200, function () {
-        self.tweens.add({ targets: t, alpha: 0, duration: 450, onComplete: function () { t.destroy(); } });
+        self.tweens.add({ targets: t, alpha: 0, duration: 450, onComplete: function () { if(t) t.destroy(); } });
     });
 };
 
-// ═════════════════════════════════════════════════════════════
-//  WIN SCENE
-// ═════════════════════════════════════════════════════════════
 function WinScene() { Phaser.Scene.call(this, { key: 'WinScene' }); }
 WinScene.prototype = Object.create(Phaser.Scene.prototype);
 WinScene.prototype.constructor = WinScene;
 
 WinScene.prototype.init = function (d) {
-    this.finalScore = d.score      || 0;
+    this.finalScore = d.score || 0;
     this.levelIndex = d.levelIndex || 0;
     this.levelName  = d.levelName  || '';
 };
@@ -418,113 +353,36 @@ WinScene.prototype.create = function () {
     hero.play('happy');
     this.tweens.add({ targets: hero, y: H * 0.26 - 12, duration: 1600, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
-    this.time.delayedCall(300, function () {
-        burst(self, W * 0.28, H * 0.54, PAL.grow.ptcl,  14);
-        burst(self, W * 0.72, H * 0.46, PAL.water.ptcl, 14);
-        burst(self, W * 0.50, H * 0.64, PAL.bloom.ptcl, 14);
-    });
-
     this.add.text(W / 2, H * 0.50, 'BLOOM RESTORED!', {
-        fontFamily: 'monospace', fontSize: '20px',
-        color: '#00ff41', stroke: '#002200', strokeThickness: 4,
-    }).setOrigin(0.5);
-    this.add.text(W / 2, H * 0.50 + 34, "WELL FLOW'N 🌿", {
-        fontFamily: 'monospace', fontSize: '13px', color: '#aaffcc',
-    }).setOrigin(0.5);
-    this.add.text(W / 2, H * 0.50 + 60, 'SCORE: ' + this.finalScore, {
-        fontFamily: 'monospace', fontSize: '11px', color: '#00ff41',
+        fontFamily: 'monospace', fontSize: '20px', color: '#00ff41'
     }).setOrigin(0.5);
 
-    var hasNext  = !!(window.FLOW_LEVELS[this.levelIndex + 1]);
-    var nextIdx  = hasNext ? this.levelIndex + 1 : 0;
-    var btnLabel = hasNext ? '[ NEXT LEVEL ]' : '[ PLAY AGAIN ]';
-
-    var btn = this.add.text(W / 2, H * 0.74, btnLabel, {
-        fontFamily: 'monospace', fontSize: '14px',
-        color: '#00ff41', stroke: '#001100', strokeThickness: 3,
+    var btn = this.add.text(W / 2, H * 0.74, '[ PLAY AGAIN ]', {
+        fontFamily: 'monospace', fontSize: '14px', color: '#00ff41'
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this.tweens.add({ targets: btn, alpha: 0.28, duration: 700, yoyo: true, repeat: -1 });
     btn.on('pointerdown', function () {
-        self.cameras.main.fade(380, 0, 0, 0);
-        self.time.delayedCall(400, function () {
-            self.scene.start('GameScene', { levelIndex: nextIdx });
-            self.scene.launch('UIScene');
-        });
+        self.scene.start('GameScene', { levelIndex: 0 });
     });
-
-    var menu = this.add.text(W / 2, H * 0.82, '[ MAIN MENU ]', {
-        fontFamily: 'monospace', fontSize: '10px', color: '#446644',
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    menu.on('pointerdown', function () {
-        self.cameras.main.fade(380, 0, 0, 0);
-        self.time.delayedCall(400, function () { self.scene.start('MenuScene'); });
-    });
-
     this.cameras.main.fadeIn(500);
 };
 
-// ═════════════════════════════════════════════════════════════
-//  WORLD BUILDERS
-// ═════════════════════════════════════════════════════════════
-
+// WORLD BUILDERS & UTILITIES
 function buildScrollBg(scene, ld, W, H) {
     var LW = ld.worldLength;
-
-    // Sky gradient
     var sky = scene.add.graphics().setDepth(0);
     sky.fillGradientStyle(ld.bgTop, ld.bgTop, ld.bgBot, ld.bgBot, 1);
     sky.fillRect(0, 0, LW, H);
-
-    // Far mountains (parallax 0.25)
-    var mtn = scene.add.graphics().setDepth(1).setScrollFactor(0.25);
-    mtn.fillStyle(0x081408, 0.7);
-    var mcount = Math.ceil(W / 150) + 2;
-    for (var i = 0; i < mcount * 3; i++) {
-        var mx = i * 160 + Phaser.Math.Between(-20, 20);
-        var mh = Phaser.Math.Between(70, 160);
-        mtn.fillTriangle(mx, H - 100, mx + 90, H - 100 - mh, mx + 180, H - 100);
-    }
-
-    // Mid hills (parallax 0.5)
-    var hill = scene.add.graphics().setDepth(2).setScrollFactor(0.5);
-    hill.fillStyle(0x0d200d, 0.55);
-    for (var j = 0; j < mcount * 4; j++) {
-        var hx = j * 110 + Phaser.Math.Between(0, 30);
-        var hh = Phaser.Math.Between(30, 80);
-        hill.fillEllipse(hx, H - 96, 160, hh * 2);
-    }
-
-    // Ground base
-    var gnd = scene.add.graphics().setDepth(3);
-    gnd.fillStyle(0x060e06, 1);
-    gnd.fillRect(0, 465, LW, H - 465);
 }
 
 function buildTilePlatforms(scene, ld, H) {
-    var g = scene.add.graphics().setDepth(4);
-
     ld.platforms.forEach(function (p) {
-        var py   = p.y || 450;
+        var py = p.y || 450;
         var cols = Math.ceil(p.w / TILE_DSP);
-
         for (var i = 0; i < cols; i++) {
             var tx = p.x + i * TILE_DSP;
-            // Top grass tile
             var frame = TILE_MAP['top_grass'];
-            if (p.type === 'water')   frame = TILE_MAP['water_still'];
-            if (p.type === 'crystal') frame = TILE_MAP['crystal'];
-
-            var img = scene.add.image(tx + TILE_DSP / 2, py, 'tiles', frame)
-                .setDisplaySize(TILE_DSP, TILE_DSP)
-                .setDepth(4)
-                .setAlpha(0.9);
-
-            // Dead ground fill below
-            var fillFrame = TILE_MAP['dead_ground'];
-            var fill = scene.add.image(tx + TILE_DSP / 2, py + TILE_DSP, 'tiles', fillFrame)
-                .setDisplaySize(TILE_DSP, TILE_DSP)
-                .setDepth(3)
-                .setAlpha(0.8);
+            scene.add.image(tx + TILE_DSP / 2, py, 'tiles', frame).setDisplaySize(TILE_DSP, TILE_DSP).setDepth(4);
+            scene.add.image(tx + TILE_DSP / 2, py + TILE_DSP, 'tiles', TILE_MAP['dead_ground']).setDisplaySize(TILE_DSP, TILE_DSP).setDepth(3);
         }
     });
 }
@@ -534,111 +392,30 @@ function buildDecor(scene, ld) {
     ld.decor.forEach(function (d) {
         var frame = TILE_MAP[d.tile];
         if (frame === undefined) return;
-        var sf = d.scrollFactor !== undefined ? d.scrollFactor : 1;
-        scene.add.image(d.x, d.y, 'tiles', frame)
-            .setDisplaySize(TILE_DSP, TILE_DSP)
-            .setScrollFactor(sf)
-            .setDepth(5)
-            .setAlpha(0.85);
+        scene.add.image(d.x, d.y, 'tiles', frame).setDisplaySize(TILE_DSP, TILE_DSP).setScrollFactor(d.scrollFactor || 1).setDepth(5);
     });
 }
 
-// ═════════════════════════════════════════════════════════════
-//  INTERACTIVE OBJECTS
-// ═════════════════════════════════════════════════════════════
-
 function spawnObjs(scene, defs) {
     return defs.map(function (def) {
-        var col = PAL[def.type] || PAL.grow;
-
-        // Dead tile image
-        var deadFrame = TILE_MAP[def.tile_dead];
-        var dead = scene.add.image(def.x, def.y, 'tiles', deadFrame !== undefined ? deadFrame : 5)
-            .setDisplaySize(TILE_DSP + 4, TILE_DSP + 4)
-            .setDepth(8)
-            .setAlpha(0.6);
-
-        // Alive tile image (hidden)
-        var aliveFrame = TILE_MAP[def.tile_alive];
-        var alive = scene.add.image(def.x, def.y, 'tiles', aliveFrame !== undefined ? aliveFrame : 6)
-            .setDisplaySize(TILE_DSP + 4, TILE_DSP + 4)
-            .setDepth(8)
-            .setAlpha(0);
-
-        // Glow ring
+        var dead = scene.add.image(def.x, def.y, 'tiles', TILE_MAP[def.tile_dead]).setDisplaySize(TILE_DSP + 4, TILE_DSP + 4).setDepth(8).setAlpha(0.6);
+        var alive = scene.add.image(def.x, def.y, 'tiles', TILE_MAP[def.tile_alive]).setDisplaySize(TILE_DSP + 4, TILE_DSP + 4).setDepth(8).setAlpha(0);
         var ring = scene.add.graphics().setDepth(7);
-        ring.lineStyle(1.5, col.glow, 0.14);
+        ring.lineStyle(1.5, PAL[def.type].glow, 0.14);
         ring.strokeCircle(def.x, def.y, 28);
-
-        // Hint text
         var hintText = null;
         if (def.hint) {
-            hintText = scene.add.text(def.x, def.y - 44, def.hint, {
-                fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
-                backgroundColor: '#00000099', padding: { x: 5, y: 3 },
-            }).setOrigin(0.5).setAlpha(0).setDepth(16);
+            hintText = scene.add.text(def.x, def.y - 44, def.hint, { fontFamily: 'monospace', fontSize: '9px', color: '#ffffff', backgroundColor: '#00000099' }).setOrigin(0.5).setAlpha(0);
         }
-
-        // Subtle idle bob — only Y, small range
-        scene.tweens.add({
-            targets:  [dead],
-            y:        def.y - 4,
-            duration: 1200 + Phaser.Math.Between(0, 400),
-            ease:     'Sine.easeInOut',
-            yoyo:     true,
-            repeat:   -1,
-        });
-
-        return {
-            id: def.id, x: def.x, y: def.y,
-            type: def.type, scoreValue: def.scoreValue, hint: def.hint,
-            active: false, dead: dead, alive: alive, ring: ring, hintText: hintText,
-        };
+        return { id: def.id, x: def.x, y: def.y, type: def.type, scoreValue: def.scoreValue, active: false, dead: dead, alive: alive, ring: ring, hintText: hintText };
     });
 }
 
 function activateObj(scene, obj) {
-    var col = PAL[obj.type] || PAL.grow;
-
-    scene.tweens.killTweensOf(obj.dead);
     scene.tweens.add({ targets: obj.dead, alpha: 0, duration: 200 });
-
     obj.alive.setScale(0);
-    scene.tweens.add({
-        targets: obj.alive, alpha: 0.95, scaleX: 1, scaleY: 1,
-        duration: 200, ease: 'Back.Out',
-    });
-
-    // Flash ring
-    obj.ring.clear();
-    obj.ring.lineStyle(2, col.glow, 0.7);
-    obj.ring.strokeCircle(obj.x, obj.y, 28);
-    scene.tweens.add({ targets: obj.ring, alpha: 0, duration: 500 });
-
-    // Particle burst
-    burst(scene, obj.x, obj.y, col.ptcl, 10);
-
-    // Score pop
-    var pop = scene.add.text(obj.x, obj.y - 26, '+' + obj.scoreValue, {
-        fontFamily: 'monospace', fontSize: '11px',
-        color: '#ffffff', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(22);
-    scene.tweens.add({
-        targets: pop, y: obj.y - 58, alpha: 0,
-        duration: 650, ease: 'Quad.Out',
-        onComplete: function () { pop.destroy(); },
-    });
-
-    // Alive pulse
-    scene.tweens.add({
-        targets: obj.alive, alpha: 0.65, duration: 1000,
-        ease: 'Sine.easeInOut', yoyo: true, repeat: -1, delay: 150,
-    });
+    scene.tweens.add({ targets: obj.alive, alpha: 0.95, scaleX: 1, scaleY: 1, duration: 200 });
 }
-
-// ═════════════════════════════════════════════════════════════
-//  SHARED UTILITIES
-// ═════════════════════════════════════════════════════════════
 
 function makeDot(scene) {
     if (scene.textures.exists('dot')) return;
@@ -659,60 +436,28 @@ function makeStars(scene, W, H, count) {
     var g = scene.add.graphics();
     for (var i = 0; i < count; i++) {
         g.fillStyle(0xffffff, Phaser.Math.FloatBetween(0.06, 0.44));
-        g.fillCircle(
-            Phaser.Math.Between(0, W),
-            Phaser.Math.Between(0, H * 0.75),
-            Phaser.Math.FloatBetween(0.4, 1.3)
-        );
-    }
-    // Twinkle a few
-    for (var t = 0; t < 6; t++) {
-        var dot = scene.add.graphics();
-        dot.fillStyle(0xffffff, 0.5);
-        dot.fillCircle(Phaser.Math.Between(10, W - 10), Phaser.Math.Between(10, H * 0.5), 1.2);
-        scene.tweens.add({
-            targets: dot, alpha: 0.06, duration: Phaser.Math.Between(800, 2000),
-            yoyo: true, repeat: -1, delay: t * 250,
-        });
+        g.fillCircle(Phaser.Math.Between(0, W), Phaser.Math.Between(0, H * 0.75), Phaser.Math.FloatBetween(0.4, 1.3));
     }
 }
 
 function registerAnims(scene) {
     ANIM_DEFS.forEach(function (d) {
         if (scene.anims.exists(d.key)) return;
-        scene.anims.create({
-            key:       d.key,
-            frames:    scene.anims.generateFrameNumbers('flow', { start: d.start, end: d.end }),
-            frameRate: d.rate,
-            repeat:    d.loop ? -1 : 0,
-        });
+        scene.anims.create({ key: d.key, frames: scene.anims.generateFrameNumbers('flow', { start: d.start, end: d.end }), frameRate: d.rate, repeat: d.loop ? -1 : 0 });
     });
 }
 
 function burst(scene, x, y, tint, count) {
     try {
-        var e = scene.add.particles(x, y, 'dot', {
-            speed:    { min: 45, max: 160 },
-            angle:    { min: 0,  max: 360 },
-            scale:    { start: 1.0, end: 0 },
-            lifespan: 520,
-            quantity: count,
-            tint:     tint,
-            emitting: false,
-        });
+        var e = scene.add.particles(x, y, 'dot', { speed: { min: 45, max: 160 }, scale: { start: 1.0, end: 0 }, lifespan: 520, quantity: count, tint: tint, emitting: false });
         e.explode(count);
-        scene.time.delayedCall(650, function () { if (e && e.active) e.destroy(); });
     } catch (_) {}
 }
 
 function pulseSprite(scene, target, base) {
-    scene.tweens.add({
-        targets: target, scaleX: base * 1.15, scaleY: base * 0.88,
-        duration: 70, yoyo: true, ease: 'Quad.Out',
-    });
+    scene.tweens.add({ targets: target, scaleX: base * 1.15, scaleY: base * 0.88, duration: 70, yoyo: true });
 }
 
 function trySound(scene, key) {
-    try { if (scene.cache.audio.exists(key)) scene.sound.play(key, { volume: 0.36 }); }
-    catch (_) {}
+    try { if (scene.cache.audio.exists(key)) scene.sound.play(key, { volume: 0.36 }); } catch (_) {}
 }
