@@ -4,18 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>Flow | Home</title>
-    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/png" href="flowbot.png">
     <link rel="apple-touch-icon" href="flowbot.png">
-
     <meta property="og:title" content="FLOW // THE GARDEN">
     <meta property="og:description" content="Accessing Novel & Manga Archives. Join the movement.">
     <meta property="og:image" content="https://flowtheflower.github.io/flowbot.png">
     <meta property="og:url" content="https://flowtheflower.github.io/">
     <meta property="og:type" content="website">
-
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
 </head>
@@ -23,9 +20,7 @@
 
     <nav class="top-nav">
         <div class="logo-container">
-            <div class="logo-box">
-                <img src="flowbot.png" alt="Flow Logo" class="nav-logo-img">
-            </div>
+            <div class="logo-box"><img src="flowbot.png" alt="Flow Logo" class="nav-logo-img"></div>
             <div class="logo-text">FLOW<span>.</span></div>
         </div>
         <div class="nav-meta">STABLE_REL_4.0</div>
@@ -37,38 +32,59 @@
     </header>
 
     <main class="bento-grid">
+
         <a href="javascript:void(0)" class="card" onclick="openArchive('novel')">
             <img src="https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=1200" class="card-img" alt="Novel">
             <div class="content"><h3>Novel</h3><p>Data Archives // Read</p></div>
         </a>
+
         <a href="javascript:void(0)" class="card wide" onclick="openArchive('manga')">
             <img src="https://flowtheflower.github.io/flowmanga1.gif" class="card-img" alt="Manga">
             <div class="content"><h3>Manga</h3><p>Visual Uplink // View</p></div>
         </a>
-        <a href="#" class="card tall"><img src="https://flowtheflower.github.io/flowanime1.gif" class="card-img" alt="Anime"><div class="content"><h3>Anime</h3><p>Visual Uplink</p></div></a>
-        <a href="#" class="card large"><img src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200" class="card-img" alt="Mission"><div class="content"><h3>Mission</h3><p>Establishing the new flow.</p></div></a>
-        <a href="#" class="card"><img src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=600" class="card-img" alt="Wiki"><div class="content"><h3>Wiki</h3></div></a>
-        <a href="#" class="card wide"><img src="https://flowtheflower.github.io/flowmerch.png" class="card-img" alt="Merch"><div class="content"><h3>Merch</h3><p>Hardware & Apparel</p></div></a>
 
-        <!-- ✦ GAME CARD — links to /game/ subfolder -->
-        <a href="game/" class="card game-card wide">
-            <div class="game-card-bg">
-                <div class="game-pixel-grid"></div>
-                <div class="game-orbs">
-                    <span class="orb orb1"></span>
-                    <span class="orb orb2"></span>
-                    <span class="orb orb3"></span>
-                </div>
-            </div>
+        <a href="#" class="card tall">
+            <img src="https://flowtheflower.github.io/flowanime1.gif" class="card-img" alt="Anime">
+            <div class="content"><h3>Anime</h3><p>Visual Uplink</p></div>
+        </a>
+
+        <a href="#" class="card large">
+            <img src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200" class="card-img" alt="Mission">
+            <div class="content"><h3>Mission</h3><p>Establishing the new flow.</p></div>
+        </a>
+
+        <a href="#" class="card">
+            <img src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=600" class="card-img" alt="Wiki">
+            <div class="content"><h3>Wiki</h3></div>
+        </a>
+
+        <a href="#" class="card wide">
+            <img src="https://flowtheflower.github.io/flowmerch.png" class="card-img" alt="Merch">
+            <div class="content"><h3>Merch</h3><p>Hardware & Apparel</p></div>
+        </a>
+
+        <!-- ── GAME CARD ───────────────────────────────────── -->
+        <a href="game/" class="card wide game-card">
+            <!-- Level panorama screenshot as the card image -->
+            <img src="game_bento_preview.jpg" class="card-img game-card-img" alt="Flow: Bloomfall">
             <div class="game-badge">PLAYABLE</div>
             <div class="content">
                 <h3>Game</h3>
-                <p>Flow: Bloomfall // Tap to restore</p>
+                <p>Flow: Bloomfall // Tap to restore the bloom</p>
             </div>
         </a>
+        <!-- ──────────────────────────────────────────────── -->
 
-        <a href="#" class="card wide"><img src="https://flowtheflower.github.io/flowpod.png" class="card-img" alt="Podcast"><div class="content"><h3>Podcast</h3><p>Tune In</p></div></a>
-        <a href="#" class="card"><img src="https://flowtheflower.github.io/flowdex1.jpg" class="card-img" alt="FlowDex"><div class="content"><h3>FlowDex</h3></div></a>
+        <a href="#" class="card wide">
+            <img src="https://flowtheflower.github.io/flowpod.png" class="card-img" alt="Podcast">
+            <div class="content"><h3>Podcast</h3><p>Tune In</p></div>
+        </a>
+
+        <a href="#" class="card">
+            <img src="https://flowtheflower.github.io/flowdex1.jpg" class="card-img" alt="FlowDex">
+            <div class="content"><h3>FlowDex</h3></div>
+        </a>
+
     </main>
 
     <div id="archive-overlay" class="overlay">
@@ -94,7 +110,6 @@
                 <button class="send-btn" id="send-btn">SEND</button>
             </div>
         </div>
-
         <button id="flowbot-trigger" onclick="toggleChat()">
             <img src="flowbot.png" alt="FlowBot" class="trigger-img">
         </button>
