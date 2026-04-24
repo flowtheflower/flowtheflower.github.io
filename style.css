@@ -37,8 +37,8 @@ header h1 { font-size: clamp(2.5rem, 10vw, 4.5rem); letter-spacing: 15px; font-w
 }
 .game-card-img {
     /* Show the panorama: full color, cropped to show the landscape */
-    opacity: 0.55;
-    filter: grayscale(20%) saturate(1.2);
+    opacity: 0.25;
+    filter: grayscale(100%);
     object-position: center 40%;
     transition: opacity 0.6s, filter 0.6s;
 }
