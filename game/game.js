@@ -13,17 +13,17 @@
  */
 
 // ── SPRITE ────────────────────────────────────────────────────
-var SPR_W  = 96;
-var SPR_H  = 76;
-var P_SCALE = 1.3;   // 99*1.3 ≈ 129px wide, 88*1.3 ≈ 114px tall — right-sized character
+var SPR_W  = 200;
+var SPR_H  = 160;
+var P_SCALE = 0.55;  // 200*0.55=110px wide, 160*0.55=88px tall on screen
 
 var ANIMS = [
-    { key: 'idle',       s: 0,  e: 3,  fps: 6,  loop: true  },
-    { key: 'run',        s: 4,  e: 7,  fps: 10, loop: true  },
-    { key: 'happy',      s: 8,  e: 11, fps: 8,  loop: true  },
-    { key: 'low_energy', s: 12, e: 15, fps: 5,  loop: true  },
-    { key: 'jump',       s: 16, e: 19, fps: 10, loop: false },
-    { key: 'land',       s: 20, e: 23, fps: 10, loop: false },
+    { key: 'idle',       s: 0,  e: 3,  fps: 6,  loop: true,  type: 'loop'    },
+    { key: 'run',        s: 4,  e: 7,  fps: 10, loop: true,  type: 'pingpong'},  // ping-pong = smooth stride
+    { key: 'happy',      s: 8,  e: 11, fps: 8,  loop: true,  type: 'loop'    },
+    { key: 'low_energy', s: 12, e: 15, fps: 5,  loop: true,  type: 'loop'    },
+    { key: 'jump',       s: 16, e: 19, fps: 10, loop: false, type: 'once'    },
+    { key: 'land',       s: 20, e: 23, fps: 10, loop: false, type: 'once'    },
 ];
 
 // ── TILES ─────────────────────────────────────────────────────
@@ -606,12 +606,19 @@ function stars(scene, W, H, n) {
 function registerAnims(scene) {
     ANIMS.forEach(function (a) {
         if (scene.anims.exists(a.key)) return;
-        scene.anims.create({
-            key: a.key,
-            frames: scene.anims.generateFrameNumbers('flow', { start: a.s, end: a.e }),
+        var cfg = {
+            key:       a.key,
+            frames:    scene.anims.generateFrameNumbers('flow', { start: a.s, end: a.e }),
             frameRate: a.fps,
-            repeat: a.loop ? -1 : 0,
-        });
+            repeat:    a.loop ? -1 : 0,
+        };
+        // Ping-pong: play 0→1→2→3→2→1→0→... so stride alternates naturally
+        if (a.type === 'pingpong') {
+            cfg.frames = scene.anims.generateFrameNumbers('flow', {
+                frames: [a.s, a.s+1, a.s+2, a.s+3, a.s+2, a.s+1]
+            });
+        }
+        scene.anims.create(cfg);
     });
 }
 
