@@ -13,9 +13,9 @@
  */
 
 // ── SPRITE ────────────────────────────────────────────────────
-var SPR_W  = 200;
-var SPR_H  = 160;
-var P_SCALE = 0.55;  // 200*0.55=110px wide, 160*0.55=88px tall on screen
+var SPR_W  = 220;
+var SPR_H  = 230;
+var P_SCALE = 0.50;  // 220*0.5=110px wide, 230*0.5=115px tall on screen
 
 var ANIMS = [
     { key: 'idle',       s: 0,  e: 3,  fps: 6,  loop: true,  type: 'loop'    },
