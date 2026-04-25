@@ -27,15 +27,15 @@ var ANIMS = [
 ];
 
 // ── TILES ─────────────────────────────────────────────────────
-var TILE_SRC = 64;
-var TILE_DSP = 48;
+var TILE_SRC = 64;   // source px in atlas
+var TILE_DSP = 48;   // display px on screen
+// 5×5 atlas from flow2.png — indices left-to-right, top-to-bottom
 var TILE = {
-    dead_ground:0, alive_ground:1, top_grass:2,   rock:3,
-    vines:4,       dead_plant:5,   grow_plant1:6,  grow_plant2:7,
-    bloom_flower:8,bush:9,         water_still:10, water_flow1:11,
-    water_flow2:12,waterfall_top:13,waterfall_mid:14,waterfall_btm:15,
-    lily_pad:16,   mushroom:17,    tree_trunk:18,  leaves:19,
-    background1:20,background2:21, cloud:22,       crystal:23,
+    dead_ground:0,  alive_ground:1,  top_grass:2,     rock:3,          vines:4,
+    dead_plant:5,   grow_plant1:6,   grow_plant2:7,   bloom_flower:8,  bush:9,
+    water_still:10, water_flow1:11,  water_flow2:12,  waterfall_top:13,waterfall_mid:14,
+    waterfall_btm:15,lily_pad:16,    mushroom:17,     tree_trunk:18,   leaves:19,
+    background1:20, background2:21,  cloud:22,        crystal:23,      sparkle:24,
 };
 
 // ── COLOURS ───────────────────────────────────────────────────
@@ -71,7 +71,6 @@ MenuScene.prototype.constructor = MenuScene;
 MenuScene.prototype.preload = function () {
     this.load.spritesheet('flow',  'assets/flow_game.png',   { frameWidth: SPR_W, frameHeight: SPR_H });
     this.load.spritesheet('tiles', 'assets/tiles_atlas.png', { frameWidth: TILE_SRC, frameHeight: TILE_SRC });
-    this.load.image('bg_level1', 'assets/bg_level1.jpg');
     this.load.audio('tap',    'assets/tap.wav');
     this.load.audio('grow',   'assets/grow.wav');
     this.load.audio('finale', 'assets/finale.wav');
@@ -444,58 +443,105 @@ WinScene.prototype.create = function () {
 // ═════════════════════════════════════════════════════════════
 
 function buildBg(scene, ld, H) {
-    var LW  = ld.worldLength;
-    var W   = scene.scale.width;
+    var LW = ld.worldLength;
 
-    // Sky fill behind everything in case BG doesn't cover full height
+    // Deep sky base
     var sky = scene.add.graphics().setDepth(0);
-    sky.fillStyle(0x0a1a2e, 1);
+    sky.fillGradientStyle(0x0a1a3a, 0x0a1a3a, 0x0d3020, 0x0d3020, 1);
     sky.fillRect(0, 0, LW, H);
 
-    // Use the actual level artwork as background
-    // The image is 1200x303 — tile it horizontally across the world length
-    // Scale it so its height fills roughly the top 75% of the canvas (sky + midground)
-    var bgKey = 'bg_level1';
-    if (scene.textures.exists(bgKey)) {
-        var tex      = scene.textures.get(bgKey).getSourceImage();
-        var srcW     = tex.width;   // 1200
-        var srcH     = tex.height;  // 303
-        var dispH    = H * 0.78;    // fill 78% of screen height
-        var scale    = dispH / srcH;
-        var dispW    = srcW * scale; // scaled width of one tile
-
-        // Tile the image across the full world length with parallax 0.5
-        var tilesNeeded = Math.ceil(LW / dispW) + 2;
-        for (var i = 0; i < tilesNeeded; i++) {
-            scene.add.image(i * dispW + dispW / 2, dispH / 2, bgKey)
-                .setDisplaySize(dispW, dispH)
-                .setScrollFactor(0.5)
-                .setDepth(1)
-                .setAlpha(0.92);
-        }
+    // Background tile layers (background1 = mountains, background2 = lighter sky)
+    if (ld.bgLayers) {
+        ld.bgLayers.forEach(function (layer) {
+            var f = TILE[layer.tile];
+            if (f === undefined) return;
+            var tilesX = Math.ceil(LW / TILE_DSP) + 2;
+            var tilesY = layer.rows || 8;
+            var yStart = layer.y || 0;
+            for (var ty = 0; ty < tilesY; ty++) {
+                for (var tx = 0; tx < tilesX; tx++) {
+                    scene.add.image(
+                        tx * TILE_DSP + TILE_DSP / 2,
+                        yStart + ty * TILE_DSP + TILE_DSP / 2,
+                        'tiles', f
+                    )
+                    .setDisplaySize(TILE_DSP, TILE_DSP)
+                    .setScrollFactor(layer.parallax || 0.2)
+                    .setDepth(1)
+                    .setAlpha(layer.alpha || 1.0);
+                }
+            }
+        });
     }
 
-    // Ground base strip at bottom (over the image)
+    // Clouds
+    if (ld.clouds) {
+        var cf = TILE['cloud'];
+        ld.clouds.forEach(function (c) {
+            var s = c.scale || 1;
+            scene.add.image(c.x, c.y, 'tiles', cf)
+                .setDisplaySize(TILE_DSP * s * 1.5, TILE_DSP * s)
+                .setScrollFactor(c.parallax || 0.18)
+                .setDepth(2)
+                .setAlpha(0.82);
+        });
+    }
+
+    // Ground base
     var gnd = scene.add.graphics().setDepth(3);
-    gnd.fillStyle(0x3a2010, 1);
-    gnd.fillRect(0, H - 160, LW, 160);
-    // Grass top edge
-    gnd.fillStyle(0x2d6a1f, 1);
-    gnd.fillRect(0, H - 162, LW, 6);
+    gnd.fillStyle(0x2a1508, 1);
+    gnd.fillRect(0, 500, LW, H - 500);
 }
 
 function buildPlatforms(scene, ld) {
+    if (!ld.platforms) return;
+
+    // Platforms
     ld.platforms.forEach(function (p) {
-        var py   = p.y || 450;
-        var cols = Math.ceil(p.w / TILE_DSP);
+        var py         = p.y;
+        var cols       = Math.ceil(p.w / TILE_DSP);
+        var topFrame   = TILE[p.type]  !== undefined ? TILE[p.type]  : TILE['top_grass'];
+        var underFrame = TILE[p.under] !== undefined ? TILE[p.under] : TILE['dead_ground'];
+        var underRows  = p.underRows || 2;
         for (var i = 0; i < cols; i++) {
-            var tx = p.x + i * TILE_DSP;
-            scene.add.image(tx + TILE_DSP / 2, py, 'tiles', TILE['top_grass'])
-                .setDisplaySize(TILE_DSP, TILE_DSP).setDepth(4).setAlpha(0.92);
-            scene.add.image(tx + TILE_DSP / 2, py + TILE_DSP, 'tiles', TILE['dead_ground'])
-                .setDisplaySize(TILE_DSP, TILE_DSP).setDepth(3).setAlpha(0.85);
+            var cx = p.x + i * TILE_DSP + TILE_DSP / 2;
+            scene.add.image(cx, py + TILE_DSP / 2, 'tiles', topFrame)
+                .setDisplaySize(TILE_DSP, TILE_DSP).setDepth(6).setAlpha(0.95);
+            for (var r = 1; r <= underRows; r++) {
+                scene.add.image(cx, py + TILE_DSP * r + TILE_DSP / 2, 'tiles', underFrame)
+                    .setDisplaySize(TILE_DSP, TILE_DSP).setDepth(5).setAlpha(0.92);
+            }
         }
     });
+
+    // Waterfall
+    if (ld.waterfall) {
+        ld.waterfall.forEach(function (w) {
+            var f = TILE[w.tile];
+            if (f === undefined) return;
+            scene.add.image(w.x + TILE_DSP / 2, w.y + TILE_DSP / 2, 'tiles', f)
+                .setDisplaySize(TILE_DSP, TILE_DSP).setDepth(5).setAlpha(0.9);
+        });
+    }
+
+    // Water pool
+    if (ld.waterPool) {
+        ld.waterPool.forEach(function (w) {
+            var f = TILE[w.tile];
+            if (f === undefined) return;
+            scene.add.image(w.x + TILE_DSP / 2, w.y + TILE_DSP / 2, 'tiles', f)
+                .setDisplaySize(TILE_DSP, TILE_DSP).setDepth(4).setAlpha(0.88);
+        });
+    }
+
+    // Lily pads
+    if (ld.lilyPads) {
+        var lf = TILE['lily_pad'];
+        ld.lilyPads.forEach(function (lp) {
+            scene.add.image(lp.x, lp.y, 'tiles', lf)
+                .setDisplaySize(TILE_DSP * 0.9, TILE_DSP * 0.9).setDepth(5).setAlpha(0.95);
+        });
+    }
 }
 
 function buildDecor(scene, ld) {
@@ -503,12 +549,15 @@ function buildDecor(scene, ld) {
     ld.decor.forEach(function (d) {
         var f = TILE[d.tile];
         if (f === undefined) return;
+        var sz = d.size || TILE_DSP;
         scene.add.image(d.x, d.y, 'tiles', f)
-            .setDisplaySize(TILE_DSP, TILE_DSP)
+            .setDisplaySize(sz, sz)
             .setScrollFactor(d.scrollFactor !== undefined ? d.scrollFactor : 1)
-            .setDepth(5).setAlpha(0.88);
+            .setDepth(7)
+            .setAlpha(d.alpha !== undefined ? d.alpha : 0.92);
     });
 }
+
 
 // ═════════════════════════════════════════════════════════════
 //  INTERACTIVE OBJECTS
