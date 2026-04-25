@@ -19,7 +19,7 @@ var P_SCALE = 0.50;  // 220*0.5=110px wide, 230*0.5=115px tall on screen
 
 var ANIMS = [
     { key: 'idle',       s: 0,  e: 3,  fps: 6,  loop: true,  type: 'loop'    },
-    { key: 'run',        s: 4,  e: 7,  fps: 10, loop: true,  type: 'pingpong'},  // ping-pong = smooth stride
+    { key: 'run',        s: 4,  e: 7,  fps: 10, loop: true,  type: 'stride' }, // 6-frame stride with midpoints
     { key: 'happy',      s: 8,  e: 11, fps: 8,  loop: true,  type: 'loop'    },
     { key: 'low_energy', s: 12, e: 15, fps: 5,  loop: true,  type: 'loop'    },
     { key: 'jump',       s: 16, e: 19, fps: 10, loop: false, type: 'once'    },
@@ -49,7 +49,7 @@ var PAL = {
 var SPEED   = 88;    // px/s horizontal
 var JUMP    = -400;  // px/s initial vertical
 var GRAV    = 860;   // px/s² downward
-var FLOOR_Y = 438;   // world Y where Flow's feet rest
+var FLOOR_Y = 472;   // world Y where Flow's feet rest (sits on ground at H-162=478, minus half-height)
 var E_COST  = 18;
 
 // ─────────────────────────────────────────────────────────────
@@ -71,6 +71,7 @@ MenuScene.prototype.constructor = MenuScene;
 MenuScene.prototype.preload = function () {
     this.load.spritesheet('flow',  'assets/flow_game.png',   { frameWidth: SPR_W, frameHeight: SPR_H });
     this.load.spritesheet('tiles', 'assets/tiles_atlas.png', { frameWidth: TILE_SRC, frameHeight: TILE_SRC });
+    this.load.image('bg_level1', 'assets/bg_level1.jpg');
     this.load.audio('tap',    'assets/tap.wav');
     this.load.audio('grow',   'assets/grow.wav');
     this.load.audio('finale', 'assets/finale.wav');
@@ -443,34 +444,44 @@ WinScene.prototype.create = function () {
 // ═════════════════════════════════════════════════════════════
 
 function buildBg(scene, ld, H) {
-    var LW = ld.worldLength;
+    var LW  = ld.worldLength;
+    var W   = scene.scale.width;
+
+    // Sky fill behind everything in case BG doesn't cover full height
     var sky = scene.add.graphics().setDepth(0);
-    sky.fillGradientStyle(ld.bgTop, ld.bgTop, ld.bgBot, ld.bgBot, 1);
+    sky.fillStyle(0x0a1a2e, 1);
     sky.fillRect(0, 0, LW, H);
 
-    // Mountains parallax 0.25
-    var mtn = scene.add.graphics().setScrollFactor(0.25).setDepth(1);
-    mtn.fillStyle(0x071407, 0.75);
-    for (var i = 0; i < Math.ceil(LW / 150) + 2; i++) {
-        var mx = i * 155 + Phaser.Math.Between(-12, 12);
-        var mh = Phaser.Math.Between(80, 170);
-        mtn.fillTriangle(mx, H - 96, mx + 80, H - 96 - mh, mx + 160, H - 96);
+    // Use the actual level artwork as background
+    // The image is 1200x303 — tile it horizontally across the world length
+    // Scale it so its height fills roughly the top 75% of the canvas (sky + midground)
+    var bgKey = 'bg_level1';
+    if (scene.textures.exists(bgKey)) {
+        var tex      = scene.textures.get(bgKey).getSourceImage();
+        var srcW     = tex.width;   // 1200
+        var srcH     = tex.height;  // 303
+        var dispH    = H * 0.78;    // fill 78% of screen height
+        var scale    = dispH / srcH;
+        var dispW    = srcW * scale; // scaled width of one tile
+
+        // Tile the image across the full world length with parallax 0.5
+        var tilesNeeded = Math.ceil(LW / dispW) + 2;
+        for (var i = 0; i < tilesNeeded; i++) {
+            scene.add.image(i * dispW + dispW / 2, dispH / 2, bgKey)
+                .setDisplaySize(dispW, dispH)
+                .setScrollFactor(0.5)
+                .setDepth(1)
+                .setAlpha(0.92);
+        }
     }
 
-    // Hills parallax 0.5
-    var hls = scene.add.graphics().setScrollFactor(0.5).setDepth(2);
-    hls.fillStyle(0x0c1f0c, 0.6);
-    for (var j = 0; j < Math.ceil(LW / 100) + 2; j++) {
-        hls.fillEllipse(j * 105 + Phaser.Math.Between(0, 20), H - 90,
-                        155, Phaser.Math.Between(50, 95));
-    }
-
-    // Ground base
-    var g = scene.add.graphics().setDepth(3);
-    g.fillStyle(0x060e06, 1);
-    g.fillRect(0, 454, LW, H - 454);
-    g.fillStyle(0x003311, 1);
-    g.fillRect(0, 452, LW, 4);
+    // Ground base strip at bottom (over the image)
+    var gnd = scene.add.graphics().setDepth(3);
+    gnd.fillStyle(0x3a2010, 1);
+    gnd.fillRect(0, H - 160, LW, 160);
+    // Grass top edge
+    gnd.fillStyle(0x2d6a1f, 1);
+    gnd.fillRect(0, H - 162, LW, 6);
 }
 
 function buildPlatforms(scene, ld) {
@@ -612,10 +623,16 @@ function registerAnims(scene) {
             frameRate: a.fps,
             repeat:    a.loop ? -1 : 0,
         };
-        // Ping-pong: play 0→1→2→3→2→1→0→... so stride alternates naturally
         if (a.type === 'pingpong') {
             cfg.frames = scene.anims.generateFrameNumbers('flow', {
                 frames: [a.s, a.s+1, a.s+2, a.s+3, a.s+2, a.s+1]
+            });
+        }
+        // stride: 6-frame cycle using blended midpoint frames (row 6 = frames 24-27)
+        // sequence: pose0, blend01, pose1, pose2, blend23, pose3
+        if (a.type === 'stride') {
+            cfg.frames = scene.anims.generateFrameNumbers('flow', {
+                frames: [4, 24, 5, 6, 26, 7]
             });
         }
         scene.anims.create(cfg);
