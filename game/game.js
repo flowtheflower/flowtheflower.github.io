@@ -49,15 +49,16 @@ var PAL = {
 };
 
 // ── PHYSICS ───────────────────────────────────────────────────
-var SPEED        = 88;    // px/s horizontal
-var JUMP_VEL     = -420;  // px/s upward on first jump
-var JUMP2_VEL    = -360;  // px/s upward on double jump (slightly weaker)
-var GRAV         = 900;   // px/s² downward
-var WORLD_FLOOR  = 472;   // absolute fallback floor Y (feet)
-var E_COST       = 18;    // energy per tap
-var E_REGEN      = 0.10;  // energy per frame
-var EXHAUST_THRESH = 15;  // below this energy → exhausted
-var EXHAUST_RECOVER = 45; // recover to this before moving again
+var SPEED           = 160;   // max px/s horizontal (at full 80px drag)
+var JUMP_VEL        = -420;  // px/s upward on first jump
+var JUMP2_VEL       = -340;  // px/s upward on double jump
+var GRAV            = 900;   // px/s² downward
+var WORLD_FLOOR     = 472;   // absolute fallback floor Y (feet)
+var E_COST          = 22;    // energy drained per object activation
+var E_REGEN         = 0.08;  // energy per frame (slow, deliberate)
+var EXHAUST_THRESH  = 0;     // energy = 0 → exhausted
+var EXHAUST_RECOVER = 35;    // recover to this before moving again
+var ACTIVATE_RANGE  = 72;    // px proximity to begin fill timer
 
 // ── BOOT ──────────────────────────────────────────────────────
 new Phaser.Game({
@@ -101,7 +102,7 @@ MenuScene.prototype.create = function () {
     this.add.text(W/2, H*0.60+42, 'BLOOMFALL', {
         fontFamily:'monospace', fontSize:'20px', color:'#aaffcc', stroke:'#002211', strokeThickness:3
     }).setOrigin(0.5);
-    this.add.text(W/2, H*0.73, 'restore the bloom  ·  tap to grow', {
+    this.add.text(W/2, H*0.73, 'drag to move  ·  tap to jump  ·  restore the bloom', {
         fontFamily:'monospace', fontSize:'9px', color:'#446644'
     }).setOrigin(0.5);
 
@@ -163,17 +164,53 @@ GameScene.prototype.create = function () {
     this.player = this.add.sprite(this.px, this.py, 'flow')
         .setScale(P_SCALE).setDepth(20);
     registerAnims(this);
-    this.playAnim('run');
+    this.playAnim('idle');
 
-    // Camera: follow with offset so world is ahead
+    // ── Drag-to-move input state ───────────────────────────────
+    this.dragActive   = false;    // pointer is currently held
+    this.dragStartX   = 0;        // world X where drag began
+    this.dragStartY   = 0;
+    this.dragDeltaX   = 0;        // current horizontal drag offset
+    this.velX         = 0;        // current horizontal velocity (set by drag)
+    this.TAP_THRESHOLD = 12;      // px movement below which = tap (jump)
+
+    // Drag arrow indicator (world-space, above player)
+    this.dragArrow = this.add.graphics().setDepth(25);
+
+    this.input.on('pointerdown', function (ptr) {
+        self.dragActive = true;
+        self.dragStartX = ptr.x;
+        self.dragStartY = ptr.y;
+        self.dragDeltaX = 0;
+    });
+
+    this.input.on('pointermove', function (ptr) {
+        if (!self.dragActive) return;
+        self.dragDeltaX = ptr.x - self.dragStartX;
+    });
+
+    this.input.on('pointerup', function (ptr) {
+        if (!self.dragActive) return;
+        var totalDrag = Math.abs(ptr.x - self.dragStartX);
+        self.dragActive = false;
+        self.velX       = 0;
+        self.dragArrow.clear();
+
+        // Tap: no significant drag → jump
+        if (totalDrag < self.TAP_THRESHOLD) {
+            self.doJump();
+        }
+    });
+
+    // ── Proximity activation state (per object) ───────────────
+    // o.fillTimer = ms spent in range, o.fillBar = Graphics
+    this.ACTIVATE_TIME = 1500;   // ms to hold proximity before activation
+
+    // Camera: no fixed offset — centers on player (free exploration)
     this.camTarget = { x:this.px, y:this.py };
     this.cameras.main.setBounds(0, 0, ld.worldLength, H);
     this.cameras.main.startFollow(this.camTarget, true, 0.10, 0.10);
-    this.cameras.main.setFollowOffset(-(W * 0.22), 0);
     this.cameras.main.fadeIn(400);
-
-    // Input: tap = activate nearest object OR double-jump if airborne
-    this.input.on('pointerdown', function () { self.onTap(); });
 
     this.time.delayedCall(80, function () {
         self.events.emit('levelStart', { name:ld.name, total:ld.objects.length });
@@ -182,57 +219,89 @@ GameScene.prototype.create = function () {
 
 GameScene.prototype.update = function (time, delta) {
     if (this.ended) return;
-    var dt = Math.min(delta / 1000, 0.05);
+    var dt   = Math.min(delta / 1000, 0.05);
+    var self = this;
 
     // ── Exhaustion check ───────────────────────────────────────
     if (!this.exhausted && this.energy <= EXHAUST_THRESH) {
         this.exhausted = true;
+        this.velX = 0;
         this.playAnim('exhausted');
     }
     if (this.exhausted && this.energy >= EXHAUST_RECOVER) {
         this.exhausted = false;
     }
 
-    // ── Horizontal movement (stop when exhausted) ──────────────
+    // ── Horizontal velocity from drag ──────────────────────────
     if (!this.exhausted) {
-        this.px += SPEED * dt;
+        if (this.dragActive) {
+            // Scale drag distance to speed: 80px drag = max speed
+            var raw   = this.dragDeltaX / 80;
+            var clamped = Math.max(-1, Math.min(1, raw));
+            this.velX = clamped * SPEED;
+        } else {
+            // Friction: decelerate quickly when drag released
+            this.velX *= 0.75;
+            if (Math.abs(this.velX) < 1) this.velX = 0;
+        }
+    } else {
+        this.velX = 0;
     }
 
-    // ── Vertical (gravity always applies) ─────────────────────
+    // Flip sprite to face movement direction
+    if (this.velX > 2)       this.player.setFlipX(false);
+    else if (this.velX < -2) this.player.setFlipX(true);
+
+    this.px += this.velX * dt;
+
+    // Clamp to world bounds
+    this.px = Math.max(20, Math.min(this.ld.worldLength - 20, this.px));
+
+    // ── Draw drag arrow ────────────────────────────────────────
+    this.dragArrow.clear();
+    if (this.dragActive && Math.abs(this.dragDeltaX) > this.TAP_THRESHOLD && !this.exhausted) {
+        var ax    = this.px;
+        var ay    = this.py - 75;
+        var len   = Math.min(Math.abs(this.dragDeltaX), 60);
+        var dir   = this.dragDeltaX > 0 ? 1 : -1;
+        this.dragArrow.lineStyle(3, 0x00ff88, 0.7);
+        this.dragArrow.beginPath();
+        this.dragArrow.moveTo(ax - dir * len * 0.5, ay);
+        this.dragArrow.lineTo(ax + dir * len * 0.5, ay);
+        // Arrowhead
+        this.dragArrow.lineTo(ax + dir * len * 0.5 - dir * 10, ay - 7);
+        this.dragArrow.moveTo(ax + dir * len * 0.5, ay);
+        this.dragArrow.lineTo(ax + dir * len * 0.5 - dir * 10, ay + 7);
+        this.dragArrow.strokePath();
+    }
+
+    // ── Vertical (gravity) ────────────────────────────────────
     this.velY += GRAV * dt;
     this.py   += this.velY * dt;
 
     // ── Platform collision ─────────────────────────────────────
     var landed = false;
-    var floorY  = WORLD_FLOOR;  // fallback
+    var floorY = WORLD_FLOOR;
 
-    // Check each platform
     this.platforms.forEach(function (p) {
-        // Only collide when falling downward and feet near platform top
-        var feetY  = this.py;
-        var feetX  = this.px;
+        var feetY  = self.py;
+        var feetX  = self.px;
         var within = feetX >= p.x && feetX <= p.x + p.w;
-        var above  = feetY - this.velY * dt <= p.y + 4;   // was above last frame
-        var on     = feetY >= p.y && feetY <= p.y + 20;   // feet at/below surface
-        if (within && on && this.velY >= 0) {
+        var on     = feetY >= p.y && feetY <= p.y + 20;
+        if (within && on && self.velY >= 0) {
             if (p.y < floorY) floorY = p.y;
             landed = true;
         }
-    }, this);
+    });
 
-    // Also check world floor
-    if (this.py >= WORLD_FLOOR) {
-        floorY = WORLD_FLOOR;
-        landed = true;
-    }
+    if (this.py >= WORLD_FLOOR) { floorY = WORLD_FLOOR; landed = true; }
 
     if (landed && this.velY >= 0) {
-        this.py       = floorY;
-        this.velY     = 0;
+        this.py        = floorY;
+        this.velY      = 0;
         this.jumpCount = 0;
         if (!this.grounded) {
             this.grounded = true;
-            var self = this;
             if (!this.exhausted) {
                 this.playAnim('land');
                 this.time.delayedCall(180, function () { self.syncAnim(); });
@@ -250,20 +319,99 @@ GameScene.prototype.update = function (time, delta) {
     // ── Energy regen ──────────────────────────────────────────
     this.energy = Math.min(this.maxEnergy, this.energy + E_REGEN);
 
-    // ── Anim sync while running/exhausted ─────────────────────
-    if (this.grounded && !this.ended) {
+    // ── Animation sync ────────────────────────────────────────
+    if (!this.ended) {
         if (this.exhausted) {
             if (this.curAnim !== 'exhausted') this.playAnim('exhausted');
-        } else {
+        } else if (!this.grounded && this.curAnim !== 'jump') {
+            // keep jump anim while airborne
+        } else if (this.curAnim !== 'land' && this.curAnim !== 'jump') {
             this.syncAnim();
         }
     }
 
-    // ── Proximity hints ───────────────────────────────────────
-    var px = this.px, self = this;
+    // ── Proximity activation ──────────────────────────────────
     this.objs.forEach(function (o) {
-        if (o.active || !o.hintTxt || self.hints[o.id]) return;
-        if (Math.abs(o.x - px) < 200) {
+        if (o.active) return;
+        var dist = Math.abs(o.x - self.px);
+        var inRange = dist < ACTIVATE_RANGE;
+
+        if (inRange && !self.exhausted) {
+            // Increment fill timer
+            o.fillTimer = (o.fillTimer || 0) + delta;
+
+            // Draw fill bar above object (world space)
+            if (!o.fillBar) {
+                o.fillBar = self.add.graphics().setDepth(18);
+            }
+            o.fillBar.clear();
+
+            var ratio  = Math.min(o.fillTimer / self.ACTIVATE_TIME, 1);
+            var bw     = 44, bh = 5;
+            var bx     = o.x - bw / 2;
+            var by     = o.y - 46;
+
+            // Background
+            o.fillBar.fillStyle(0x111111, 0.8);
+            o.fillBar.fillRoundedRect(bx, by, bw, bh, 3);
+            // Fill — colour shifts green→white as it fills
+            var fillColor = ratio > 0.8 ? 0xffffff : 0x00ff88;
+            o.fillBar.fillStyle(fillColor, 1);
+            o.fillBar.fillRoundedRect(bx, by, bw * ratio, bh, 3);
+
+            // Pulse the object when almost full
+            if (ratio > 0.85 && !o.pulsing) {
+                o.pulsing = true;
+                self.tweens.add({ targets: o.dead, scaleX: 1.15, scaleY: 1.15,
+                    duration: 120, yoyo: true, repeat: -1, id: 'obj_pulse_'+o.id });
+            }
+
+            // ACTIVATE when full
+            if (o.fillTimer >= self.ACTIVATE_TIME) {
+                o.active = true;
+                o.fillTimer = 0;
+                if (o.fillBar) { o.fillBar.clear(); }
+                if (o.pulsing) {
+                    self.tweens.killTweensOf(o.dead);
+                    o.dead.setScale(1);
+                    o.pulsing = false;
+                }
+
+                self.energy -= E_COST;
+                self.energy  = Math.max(0, self.energy);
+                self.score  += o.scoreValue;
+                activateObj(self, o);
+                self.cameras.main.shake(75, 0.002);
+                pulseSpr(self, self.player, P_SCALE);
+                trySound(self, 'grow');
+
+                if (o.type === 'grow') {
+                    self.velY = JUMP_VEL;
+                    self.grounded = false;
+                    self.jumpCount = 1;
+                    self.playAnim('jump');
+                } else if (o.type === 'water') {
+                    self.cameras.main.flash(200, 0, 70, 150, false);
+                } else if (o.type === 'bloom') {
+                    self.time.delayedCall(200, function () { self.doWin(); });
+                }
+            }
+
+        } else {
+            // Out of range — reset timer and bar
+            if (o.fillTimer > 0) {
+                o.fillTimer = 0;
+                if (o.fillBar) o.fillBar.clear();
+                if (o.pulsing) {
+                    self.tweens.killTweensOf(o.dead);
+                    o.dead.setScale(1);
+                    o.pulsing = false;
+                }
+            }
+        }
+
+        // Show hint on first approach
+        if (inRange && o.hintTxt && !self.hints[o.id]) {
             self.hints[o.id] = true;
             self.tweens.add({ targets:o.hintTxt, alpha:1, duration:260 });
             self.time.delayedCall(1800, function () {
@@ -273,7 +421,7 @@ GameScene.prototype.update = function (time, delta) {
         }
     });
 
-    // ── Emit HUD state ────────────────────────────────────────
+    // ── HUD emit ──────────────────────────────────────────────
     this.events.emit('stateUpdate', {
         energy:    this.energy,
         maxEnergy: this.maxEnergy,
@@ -284,54 +432,17 @@ GameScene.prototype.update = function (time, delta) {
     });
 };
 
-GameScene.prototype.onTap = function () {
-    if (this.ended) return;
-
-    // ── Double jump: allow if not grounded and jumpCount < 2 ──
-    if (!this.grounded && this.jumpCount < 2) {
+GameScene.prototype.doJump = function () {
+    if (this.ended || this.exhausted) return;
+    if (this.jumpCount < 2) {
         this.jumpCount++;
         var vel = this.jumpCount === 1 ? JUMP_VEL : JUMP2_VEL;
-        this.velY = vel;
+        this.velY     = vel;
         this.grounded = false;
         this.playAnim('jump');
-        this.cameras.main.shake(60, 0.0018);
-        trySound(this, 'tap');
+        this.cameras.main.shake(55, 0.0016);
         pulseSpr(this, this.player, P_SCALE);
-        return;  // jump takes priority over object activation
-    }
-
-    // ── Object activation ─────────────────────────────────────
-    if (this.energy < E_COST || this.exhausted) return;
-    this.energy -= E_COST;
-
-    this.cameras.main.shake(75, 0.002);
-    pulseSpr(this, this.player, P_SCALE);
-    trySound(this, 'tap');
-
-    var self    = this;
-    var nearest = null, best = 180;
-    this.objs.forEach(function (o) {
-        var d = Math.abs(o.x - self.px);
-        if (!o.active && d < best) { nearest = o; best = d; }
-    });
-    if (!nearest) return;
-
-    nearest.active = true;
-    this.score += nearest.scoreValue;
-    activateObj(this, nearest);
-
-    if (nearest.type === 'grow') {
-        // Jump!
-        this.velY = JUMP_VEL;
-        this.grounded = false;
-        this.jumpCount = 1;
-        this.playAnim('jump');
-        trySound(this, 'grow');
-    } else if (nearest.type === 'water') {
-        this.cameras.main.flash(200, 0, 70, 150, false);
-        trySound(this, 'grow');
-    } else if (nearest.type === 'bloom') {
-        this.time.delayedCall(200, function () { self.doWin(); });
+        trySound(this, 'tap');
     }
 };
 
@@ -363,10 +474,11 @@ GameScene.prototype.playAnim = function (key) {
 
 GameScene.prototype.syncAnim = function () {
     if (this.ended) return;
-    if      (this.exhausted)       this.playAnim('exhausted');
-    else if (this.energy < 22)     this.playAnim('low_energy');
-    else if (!this.grounded)       this.playAnim('jump');
-    else                           this.playAnim('run');
+    if      (this.exhausted)              this.playAnim('exhausted');
+    else if (!this.grounded)              { /* keep jump anim */ }
+    else if (Math.abs(this.velX) > 8)    this.playAnim('run');
+    else if (this.energy < 22)           this.playAnim('low_energy');
+    else                                  this.playAnim('idle');
 };
 
 // ═════════════════════════════════════════════════════════════
@@ -399,8 +511,8 @@ UIScene.prototype.create = function () {
         stroke:'#000000', strokeThickness:3
     }).setOrigin(0.5).setAlpha(0).setDepth(30);
 
-    var tap = this.add.text(W/2, 624, 'TAP TO FLOW', {
-        fontFamily:'monospace', fontSize:'10px', color:'#00ff41'
+    var tap = this.add.text(W/2, 624, 'DRAG TO MOVE  ·  TAP TO JUMP', {
+        fontFamily:'monospace', fontSize:'9px', color:'#00ff41'
     }).setOrigin(0.5).setAlpha(0.35);
     this.tweens.add({ targets:tap, alpha:0.08, duration:1000, yoyo:true, repeat:-1 });
 
