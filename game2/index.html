@@ -9,7 +9,15 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { background:#1a2e1a; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+        body {
+            background:#1a2e1a;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            min-height:100vh;
+            width:100%;
+            overflow:hidden;
+        }
         #back-btn {
             position:fixed; top:14px; left:14px; z-index:9999;
             background:rgba(20,40,20,0.85); border:2px solid #5a8a3a;
@@ -17,7 +25,11 @@
             font-size:0.5rem; cursor:pointer; border-radius:4px; text-decoration:none;
             letter-spacing:1px;
         }
-        canvas { display:block; image-rendering:pixelated; }
+        canvas {
+            display:block;
+            image-rendering:pixelated;
+            margin:0 auto;
+        }
     </style>
 </head>
 <body>
