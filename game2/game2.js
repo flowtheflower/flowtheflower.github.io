@@ -46,8 +46,11 @@ new Phaser.Game({
     physics: { default:'arcade', arcade:{ debug:false } },
     scene:  [BootScene, TitleScene, WorldScene, DialogueScene, UIScene],
     scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
+        mode:        Phaser.Scale.FIT,
+        autoCenter:  Phaser.Scale.CENTER_BOTH,
+        width:       360,
+        height:      640,
+        parent:      document.body,
     },
 });
 
@@ -168,6 +171,7 @@ WorldScene.prototype.create = function(){
     this.npcSprites   = {};
     this.objectSprites= {};
     this.dialogueLock = false;
+    this.dialogueCooldown = 0;  // ms remaining before NPC proximity can re-trigger
     this.bloomCount   = 0;
 
     // Calculate total bloomable tiles
@@ -327,6 +331,11 @@ WorldScene.prototype.update = function(time, delta){
     if(this.dialogueLock) return;
     var dt=Math.min(delta/1000,0.05), self=this;
 
+    // Tick dialogue re-trigger cooldown
+    if(this.dialogueCooldown > 0) {
+        this.dialogueCooldown -= delta;
+    }
+
     // ── Exhaustion ────────────────────────────────────────
     if(!this.exhausted && this.energy <= EXHAUST_THRESH){
         this.exhausted=true;
@@ -400,7 +409,7 @@ WorldScene.prototype.update = function(time, delta){
     this.nameLabel.setPosition(this.player.x, this.player.y-32);
 
     // ── NPC proximity check ───────────────────────────────
-    if(!this.exhausted){
+    if(!this.exhausted && this.dialogueCooldown <= 0){
         Object.values(this.npcSprites).forEach(function(n){
             var dx=n.sprite.x-self.player.x, dy=n.sprite.y-self.player.y;
             if(Math.sqrt(dx*dx+dy*dy)<INTERACT_RANGE && !self.dialogueLock){
@@ -561,22 +570,30 @@ WorldScene.prototype.startDialogue = function(npcOrObj){
 };
 
 WorldScene.prototype.startDialogueData = function(dlg){
+    if(this.dialogueLock) return;
     this.dialogueLock=true;
     this.player.setVelocity(0,0);
     this.moving=false;
     this.player.play('flow_idle_'+this.facing,true);
-    this.scene.launch('DialogueScene',{dialogue:dlg});
+
     var self=this;
-    this.scene.get('DialogueScene').events.once('dialogueDone',function(){
+
+    // Use Phaser's scene events bus (not the DialogueScene instance events)
+    // to avoid race conditions with scene launch timing
+    this.game.events.once('dialogueDone', function(){
         self.dialogueLock=false;
+        // Prevent immediate re-trigger by moving Flow slightly away
+        // and adding a short cooldown
+        self.dialogueCooldown=2000;
     });
+
+    this.scene.launch('DialogueScene',{dialogue:dlg});
 };
 
 WorldScene.prototype.changeArea = function(exit){
     var self=this;
     this.cameras.main.fade(400,0,0,0);
     this.time.delayedCall(420,function(){
-        self.scene.stop('DialogueScene');
         self.scene.restart({areaId:exit.toArea,entryX:exit.toX,entryY:exit.toY});
     });
 };
@@ -700,7 +717,8 @@ DialogueScene.prototype.nextPage = function(){
     if(this.pageIndex<this.dlg.pages.length-1){
         this.showPage(this.pageIndex+1);
     } else {
-        this.events.emit('dialogueDone');
+        // Emit on the global game events bus so WorldScene always receives it
+        this.game.events.emit('dialogueDone');
         this.scene.stop();
     }
 };
