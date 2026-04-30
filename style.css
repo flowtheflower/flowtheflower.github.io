@@ -37,8 +37,8 @@ header h1 { font-size: clamp(2.5rem, 10vw, 4.5rem); letter-spacing: 15px; font-w
 }
 .game-card-img {
     /* Show the panorama: full color, cropped to show the landscape */
-    opacity: 0.25;
-    filter: grayscale(100%);
+    opacity: 0.55;
+    filter: grayscale(20%) saturate(1.2);
     object-position: center 40%;
     transition: opacity 0.6s, filter 0.6s;
 }
@@ -93,6 +93,75 @@ header h1 { font-size: clamp(2.5rem, 10vw, 4.5rem); letter-spacing: 15px; font-w
 .chat-input-area { padding: 15px; border-top: 1px solid #111; display: flex; gap: 8px; }
 #user-input { background: #000; border: 1px solid #222; color: white; padding: 10px; flex: 1; border-radius: 8px; outline: none; font-size: 16px; }
 .send-btn { background: none; border: 1px solid var(--accent); color: var(--accent); padding: 5px 12px; cursor: pointer; font-size: 0.7rem; }
+
+/* --- GAME 2 CARD (Garden) --- */
+.game2-card {
+    border-color: rgba(90, 176, 48, 0.2);
+    cursor: pointer;
+    overflow: hidden;
+}
+.game2-card:hover {
+    border-color: rgba(90, 176, 48, 0.55);
+    box-shadow: 0 0 28px rgba(90, 176, 48, 0.08);
+}
+.game2-bg {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 20% 60%, rgba(42,80,20,0.7) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 30%, rgba(20,60,40,0.6) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(30,70,15,0.5) 0%, transparent 60%),
+        linear-gradient(135deg, #0e1e0e 0%, #1a2e12 40%, #0e1e1e 100%);
+}
+/* Pixel grid texture overlay */
+.game2-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(90,176,48,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(90,176,48,0.04) 1px, transparent 1px);
+    background-size: 16px 16px;
+}
+/* Animated colour patches simulating top-down tiles */
+.game2-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 40%, rgba(70,140,30,0.3) 0%, transparent 30%),
+        radial-gradient(circle at 75% 65%, rgba(30,90,80,0.25) 0%, transparent 25%),
+        radial-gradient(circle at 55% 25%, rgba(60,120,25,0.2) 0%, transparent 20%);
+    animation: gardenPulse 4s ease-in-out infinite alternate;
+}
+@keyframes gardenPulse {
+    0%   { opacity: 0.6; }
+    100% { opacity: 1.0; }
+}
+.game2-card::after {
+    background: linear-gradient(to top, rgba(10,20,8,0.9) 0%, rgba(10,20,8,0.4) 55%, transparent 100%);
+}
+.game2-badge {
+    position: absolute;
+    top: 18px; right: 18px;
+    z-index: 3;
+    font-family: monospace;
+    font-size: 0.58rem;
+    letter-spacing: 3px;
+    color: #a8d870;
+    border: 1px solid rgba(90,176,48,0.4);
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(10,20,8,0.7);
+    animation: gardenBadge 3s ease-in-out infinite;
+}
+@keyframes gardenBadge {
+    0%, 100% { opacity: 0.55; border-color: rgba(90,176,48,0.25); }
+    50%       { opacity: 1.00; border-color: rgba(90,176,48,0.7);  }
+}
+.game2-card .content { position: relative; z-index: 2; }
+.game2-card .content h3 { color: #d4f088; }
+.game2-card .content p  { color: #a8d870; }
 
 /* --- MOBILE --- */
 @media (max-width: 600px) {
