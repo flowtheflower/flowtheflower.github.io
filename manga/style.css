@@ -1,16 +1,18 @@
 :root {
   --bg: #050505;
   --accent: #00ff41;
+  --text: #e0e0e0;
 }
 
 body {
   margin: 0;
   background: var(--bg);
-  color: white;
-  font-family: sans-serif;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
   overflow: hidden;
 }
 
+/* LAYOUT */
 .reader {
   display: flex;
   flex-direction: column;
@@ -21,6 +23,7 @@ body {
 .reader-top {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 12px;
   border-bottom: 1px solid #111;
   font-size: 0.8rem;
@@ -30,32 +33,51 @@ body {
   background: none;
   border: 1px solid var(--accent);
   color: var(--accent);
-  padding: 6px 10px;
+  padding: 6px 12px;
+  cursor: pointer;
 }
 
-/* VIEWER */
-.viewer {
+/* BOOK AREA */
+.book {
   flex: 1;
+  perspective: 1400px;
   display: flex;
-  align-items: center;
   justify-content: center;
-  overflow: auto;
-  touch-action: auto; /* allow pinch zoom */
+  align-items: center;
+  overflow: hidden;
 }
 
-.viewer img {
+/* PAGE */
+.page {
+  width: 100%;
+  max-width: 900px;
+  transform-origin: left;
+  transition: transform 0.5s ease;
+  will-change: transform;
+}
+
+/* PAGE TURN EFFECT */
+.page.turn {
+  transform: rotateY(-160deg);
+}
+
+/* IMAGE */
+.page img {
   width: 100%;
   height: auto;
-  max-width: 900px;
+  display: block;
   user-select: none;
+  pointer-events: none;
 }
 
 /* NAV */
 .reader-nav {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 10px;
   border-top: 1px solid #111;
+  font-size: 0.8rem;
 }
 
 .reader-nav button {
@@ -63,4 +85,5 @@ body {
   border: 1px solid var(--accent);
   color: var(--accent);
   padding: 8px 14px;
+  cursor: pointer;
 }
