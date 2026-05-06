@@ -18,31 +18,36 @@
 var T = 48; // tile size in pixels
 
 // ── TILE DEFINITIONS ─────────────────────────────────────────
+// tiles_garden.png — 6 cols × 4 rows, 48×48 each
+// Row 0: grass variants (healthy ground)
+// Row 1: grass with flowers + wilted plants (start)
+// Row 2: more wilted + water tiles start
+// Row 3: water tiles
 window.TILE_DEFS = {
-     0: { name:'grass_healthy', walkable:true,  bloomable:false },
-     1: { name:'grass_lush',    walkable:true,  bloomable:false },
-     2: { name:'grass_wilted',  walkable:true,  bloomable:true  },
-     3: { name:'path_dirt',     walkable:true,  bloomable:false },
-     4: { name:'path_stone',    walkable:true,  bloomable:false },
-     5: { name:'floor_wood',    walkable:true,  bloomable:false },
-     6: { name:'water_deep',    walkable:false, bloomable:false },
-     7: { name:'water_shallow', walkable:false, bloomable:false },
-     8: { name:'water_edge',    walkable:true,  bloomable:false },
-     9: { name:'grass_dark',    walkable:true,  bloomable:false },
-    10: { name:'grass_autumn',  walkable:true,  bloomable:true  },
-    11: { name:'grass_dry',     walkable:true,  bloomable:true  },
-    12: { name:'bloom_ground',  walkable:true,  bloomable:false },
-    13: { name:'hemp_sprout',   walkable:true,  bloomable:false },
-    14: { name:'grass_healing', walkable:true,  bloomable:false },
-    15: { name:'path_dirt2',    walkable:true,  bloomable:false },
-    16: { name:'stone_bridge',  walkable:true,  bloomable:false },
-    17: { name:'stone_wall',    walkable:false, bloomable:false },
-    18: { name:'fence_h',       walkable:false, bloomable:false },
-    19: { name:'fence_v',       walkable:false, bloomable:false },
-    20: { name:'dirt_dark',     walkable:true,  bloomable:false },
-    21: { name:'sand_light',    walkable:true,  bloomable:false },
-    22: { name:'grass_shadow',  walkable:true,  bloomable:false },
-    23: { name:'empty',         walkable:false, bloomable:false },
+     0: { name:'grass_0',    walkable:true,  bloomable:false },
+     1: { name:'grass_1',    walkable:true,  bloomable:false },
+     2: { name:'grass_2',    walkable:true,  bloomable:false },
+     3: { name:'grass_3',    walkable:true,  bloomable:false },
+     4: { name:'grass_f0',   walkable:true,  bloomable:false },
+     5: { name:'grass_f1',   walkable:true,  bloomable:false },
+     6: { name:'grass_f2',   walkable:true,  bloomable:false },
+     7: { name:'grass_f3',   walkable:true,  bloomable:false },
+     8: { name:'wilted_0',   walkable:true,  bloomable:true  },
+     9: { name:'wilted_1',   walkable:true,  bloomable:true  },
+    10: { name:'wilted_2',   walkable:true,  bloomable:true  },
+    11: { name:'wilted_3',   walkable:true,  bloomable:true  },
+    12: { name:'wilted2_0',  walkable:true,  bloomable:true  },
+    13: { name:'wilted2_1',  walkable:true,  bloomable:true  },
+    14: { name:'wilted2_2',  walkable:true,  bloomable:true  },
+    15: { name:'wilted2_3',  walkable:true,  bloomable:true  },
+    16: { name:'water_0',    walkable:false, bloomable:false },
+    17: { name:'water_1',    walkable:false, bloomable:false },
+    18: { name:'water_2',    walkable:false, bloomable:false },
+    19: { name:'water_3',    walkable:false, bloomable:false },
+    20: { name:'water2_0',   walkable:false, bloomable:false },
+    21: { name:'water2_1',   walkable:false, bloomable:false },
+    22: { name:'water2_2',   walkable:false, bloomable:false },
+    23: { name:'water2_3',   walkable:false, bloomable:false },
 };
 
 // ── DIALOGUE LIBRARY ─────────────────────────────────────────
@@ -132,46 +137,46 @@ window.AREAS = {
         rows:  18,
         unlockRequires: null,  // always open
 
-        // 20×18 tilemap — read left-to-right, top-to-bottom
-        // Matches reference: building top-left, river right, path center,
-        // fence bottom-center, memorial bottom-right, wilted patches throughout
+        // 20×18 tilemap — new tile IDs matching extracted atlas
+        // 0-3=grass healthy, 4-7=grass flowers, 8-11=wilted,
+        // 12-15=wilted2, 16-19=water, 20-23=water2
         tilemap: [
-          // row 0 — top edge, mostly dark grass + building roof
-          17,17,17,17,17, 9, 9, 9, 2, 2, 2, 9, 9, 9, 9, 9, 6, 6, 6, 6,
+          // row 0 — top border, dark grass
+          1,1,1,1,1, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0,16,16,16,16,
           // row 1
-          17, 1, 1,17,17, 0, 0, 2, 2,11, 0, 0, 9, 9, 9, 0, 6, 7, 7, 6,
-          // row 2 — building interior + path starts
-           5, 5, 5, 5,17, 0, 3, 3, 2,11, 0, 0, 0, 9, 9, 0, 8, 7, 7, 8,
-          // row 3 — building bottom + path
-           5, 5, 5, 5,17, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 8, 7, 7, 8,
-          // row 4 — below building, sign area
-          17,17,17,17,17, 2, 3, 3, 3, 2, 0, 0, 2, 2, 0, 0, 8, 7,16, 8,
-          // row 5 — open area, wilted patches
-           9, 9, 2, 2, 2, 2, 3, 3, 3, 2, 2, 2, 2, 0, 0, 0, 0, 0,16, 0,
-          // row 6 — more open, lamp post row
-           9, 0, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 0, 0, 0, 0, 0, 8, 0,
-          // row 7 — Flow spawn row, central path
-           0, 0, 2, 0, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 0, 0,19, 0, 8, 0,
-          // row 8 — mid area
-           0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 0, 2, 2, 2, 0,19,19, 0, 0, 0,
-          // row 9 — lower mid, fence starts
-           0, 2, 2, 0, 0, 3, 3, 3, 3, 0, 0, 2,11,11,19,19, 0, 0, 0, 0,
-          // row 10 — fence row
-           9, 2, 2, 0, 0, 0, 3, 3, 0, 0,18,18,18,18, 0, 0, 0, 0, 0, 0,
-          // row 11 — below fence, history sign
-           9, 9, 2, 0, 0, 0, 3, 3, 0, 0, 0, 2,11,11, 0, 0, 0, 0, 0, 0,
+          1, 0, 0,1,1, 0, 0, 8, 8,10, 0, 0, 0, 0, 0, 0,16,17,17,16,
+          // row 2 — building interior
+          2, 2, 2, 2,1, 0, 3, 3, 8,10, 0, 0, 0, 0, 0, 0,18,17,17,18,
+          // row 3
+          2, 2, 2, 2,1, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0,18,17,16,18,
+          // row 4
+          1,1,1,1,1, 8, 3, 3, 3, 8, 0, 0, 8, 8, 0, 0,18,17,16,18,
+          // row 5
+          0, 0, 8, 8, 8, 8, 3, 3, 3, 8, 8, 8, 8, 0, 0, 0, 0, 0,18, 0,
+          // row 6
+          0, 0, 8, 8, 3, 3, 3, 3, 3, 3, 3, 8, 8, 0, 0, 0, 0, 0,18, 0,
+          // row 7 — Flow spawn
+          0, 0, 8, 0, 3, 3, 3, 3, 3, 3, 3, 3, 8, 8, 0, 0, 1, 0,18, 0,
+          // row 8
+          0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 0, 8, 8, 8, 0, 1, 1, 0, 0, 0,
+          // row 9
+          0, 8, 8, 0, 0, 3, 3, 3, 3, 0, 0, 8,10,10, 1, 1, 0, 0, 0, 0,
+          // row 10
+          0, 8, 8, 0, 0, 0, 3, 3, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+          // row 11
+          0, 0, 8, 0, 0, 0, 3, 3, 0, 0, 0, 8,10,10, 0, 0, 0, 0, 0, 0,
           // row 12
-           9, 9, 9, 2, 0, 0, 0, 2, 2, 2, 2, 2,11, 0, 0, 0, 0, 0, 0, 0,
-          // row 13 — memorial area + fence lower
-           9, 9, 9, 2, 2, 2, 2,11,11,11,11, 2, 0, 0,19, 0, 0, 0, 0, 0,
+          0, 0, 0, 8, 0, 0, 0, 8, 8, 8, 8, 8,10, 0, 0, 0, 0, 0, 0, 0,
+          // row 13
+          0, 0, 0, 8, 8, 8, 8,10,10,10,10, 8, 0, 0, 1, 0, 0, 0, 0, 0,
           // row 14
-           9, 9, 9, 9, 2, 2, 2,11,11,11,11,11, 0,19,19, 0, 0, 0, 0, 0,
-          // row 15 — bottom area
-           9, 9, 9, 9, 9, 2, 2, 2,11,11,11, 0,19,19, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 8, 8, 8,10,10,10,10,10, 0, 1, 1, 0, 0, 0, 0, 0,
+          // row 15
+          0, 0, 0, 0, 0, 8, 8, 8,10,10,10, 0, 1, 1, 0, 0, 0, 0, 0, 0,
           // row 16
-           9, 9, 9, 9, 9, 9, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
           // row 17 — bottom edge
-           9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
 
         // Player starting position (pixel coords)
