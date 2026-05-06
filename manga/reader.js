@@ -3,37 +3,49 @@ const pages = [
   "pages/002.jpg",
   "pages/003.jpg",
   "pages/004.jpg",
-  "pages/005.jpg",
+  "pages/005.jpg"
 ];
 
 let current = 0;
 
 const img = document.getElementById("page");
+const pageDiv = document.getElementById("page-container");
 const indicator = document.getElementById("page-indicator");
 
+/* UPDATE PAGE */
 function updatePage() {
   img.src = pages[current];
   indicator.innerText = `${current + 1} / ${pages.length}`;
 
-  // preload next
+  // preload next page
   if (pages[current + 1]) {
     const preload = new Image();
     preload.src = pages[current + 1];
   }
 }
 
-function nextPage() {
-  if (current < pages.length - 1) {
-    current++;
+/* PAGE TURN */
+function turnPage(direction) {
+  pageDiv.classList.add("turn");
+
+  setTimeout(() => {
+    if (direction === "next" && current < pages.length - 1) {
+      current++;
+    } else if (direction === "prev" && current > 0) {
+      current--;
+    }
+
     updatePage();
-  }
+    pageDiv.classList.remove("turn");
+  }, 300);
+}
+
+function nextPage() {
+  turnPage("next");
 }
 
 function prevPage() {
-  if (current > 0) {
-    current--;
-    updatePage();
-  }
+  turnPage("prev");
 }
 
 function exitReader() {
@@ -43,15 +55,18 @@ function exitReader() {
 /* SWIPE SUPPORT */
 let startX = 0;
 
-document.getElementById("viewer").addEventListener("touchstart", e => {
+const book = document.getElementById("book");
+
+book.addEventListener("touchstart", (e) => {
   startX = e.touches[0].clientX;
 });
 
-document.getElementById("viewer").addEventListener("touchend", e => {
-  let endX = e.changedTouches[0].clientX;
+book.addEventListener("touchend", (e) => {
+  const endX = e.changedTouches[0].clientX;
 
   if (startX - endX > 50) nextPage();
   if (endX - startX > 50) prevPage();
 });
 
+/* INIT */
 updatePage();
