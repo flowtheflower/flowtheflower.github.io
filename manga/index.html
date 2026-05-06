@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLOW // MANGA_STREAM</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="reader">
+
+  <!-- HEADER -->
+  <div class="reader-top">
+    <button onclick="exitReader()">← EXIT</button>
+    <div class="title">DATA_FLOW // MANGA</div>
+  </div>
+
+  <!-- IMAGE CONTAINER -->
+  <div id="viewer" class="viewer">
+    <img id="page" src="pages/001.jpg" />
+  </div>
+
+  <!-- NAV -->
+  <div class="reader-nav">
+    <button onclick="prevPage()">◀</button>
+    <span id="page-indicator">1 / X</span>
+    <button onclick="nextPage()">▶</button>
+  </div>
+
+</div>
+
+<script src="reader.js"></script>
+</body>
+</html>
