@@ -1,0 +1,66 @@
+:root {
+  --bg: #050505;
+  --accent: #00ff41;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: white;
+  font-family: sans-serif;
+  overflow: hidden;
+}
+
+.reader {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* TOP BAR */
+.reader-top {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 1px solid #111;
+  font-size: 0.8rem;
+}
+
+.reader-top button {
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 6px 10px;
+}
+
+/* VIEWER */
+.viewer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  touch-action: auto; /* allow pinch zoom */
+}
+
+.viewer img {
+  width: 100%;
+  height: auto;
+  max-width: 900px;
+  user-select: none;
+}
+
+/* NAV */
+.reader-nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-top: 1px solid #111;
+}
+
+.reader-nav button {
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 8px 14px;
+}
