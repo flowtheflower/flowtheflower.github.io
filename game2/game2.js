@@ -171,7 +171,8 @@ WorldScene.prototype.create = function(){
     this.npcSprites   = {};
     this.objectSprites= {};
     this.dialogueLock = false;
-    this.dialogueCooldown = 0;  // ms remaining before NPC proximity can re-trigger
+    this.dialogueCooldown = 0;
+    this.areaComplete = false;
     this.bloomCount   = 0;
 
     // Calculate total bloomable tiles
@@ -552,10 +553,70 @@ WorldScene.prototype.getBloomPct = function(){
 };
 
 WorldScene.prototype.checkCompletion = function(){
-    if(this.getBloomPct()>=100 && this.area.onComplete){
-        var dlg=window.DIALOGUES[this.area.onComplete];
-        if(dlg) this.startDialogueData(dlg);
+    if(this.getBloomPct() < 100) return;
+    if(this.areaComplete) return;  // only fire once
+    this.areaComplete = true;
+
+    var self = this;
+
+    // 1. Completion dialogue
+    if(this.area.onComplete){
+        var dlg = window.DIALOGUES[this.area.onComplete];
+        if(dlg) {
+            this.time.delayedCall(800, function(){ self.startDialogueData(dlg); });
+        }
     }
+
+    // 2. Bloom the whole map visually — replace any remaining wilted tiles
+    for(var i=0;i<this.tileState.length;i++){
+        var def = window.TILE_DEFS[this.tileState[i]];
+        if(def && def.bloomable) this.setTile(i, 12);
+    }
+
+    // 3. Notify UIScene to show completion banner
+    this.events.emit('areaComplete', { name: this.area.name });
+
+    // 4. Draw a pulsing EXIT marker on each exit tile
+    (this.area.exits||[]).forEach(function(exit){
+        self.drawExitMarker(exit);
+    });
+};
+
+WorldScene.prototype.drawExitMarker = function(exit){
+    var self  = this;
+    var cx    = exit.x + (exit.w||T) / 2;
+    var cy    = exit.y;
+
+    // Glowing arrow pointing to exit
+    var arrow = this.add.graphics().setDepth(60);
+    function drawArrow(){
+        arrow.clear();
+        arrow.fillStyle(0xa8d870, 0.92);
+        arrow.lineStyle(2, 0x1a2e0a, 1);
+        // Down-pointing triangle arrow
+        arrow.fillTriangle(cx-16, cy-44,  cx+16, cy-44,  cx, cy-24);
+        arrow.strokeTriangle(cx-16, cy-44, cx+16, cy-44, cx, cy-24);
+    }
+    drawArrow();
+    this.tweens.add({ targets:arrow, y:'-=8', duration:600,
+        ease:'Sine.easeInOut', yoyo:true, repeat:-1 });
+
+    // "EXIT →" text label
+    var lbl = this.add.text(cx, cy-60, '► NEXT AREA', Object.assign({}, FONT, {
+        fontSize:'6px', color:'#a8d870',
+        backgroundColor:'#0e1e0e99', padding:{x:6,y:3}
+    })).setOrigin(0.5).setDepth(61);
+    this.tweens.add({ targets:lbl, alpha:0.3, duration:900,
+        yoyo:true, repeat:-1 });
+
+    // Pulsing ground ring at exit
+    var ring = this.add.graphics().setDepth(58);
+    var rScale = 1;
+    this.time.addEvent({ delay:50, loop:true, callback:function(){
+        ring.clear();
+        ring.lineStyle(3, 0xa8d870, 0.5 + 0.3*Math.sin(Date.now()/300));
+        ring.strokeRect(exit.x, exit.y-T, exit.w||T, T*1.5);
+    }});
 };
 
 WorldScene.prototype.startDialogue = function(npcOrObj){
@@ -811,6 +872,9 @@ UIScene.prototype.create = function(){
         self.areaNameTxt.setText(d.name.toUpperCase().slice(0,14));
         self.dayTxt.setText(d.name.toUpperCase().slice(0,10));
     });
+    world.events.on('areaComplete', function(d){
+        self.showCompletion(d.name);
+    });
     world.events.on('showMessage',function(msg){
         self.showFlash(msg);
     });
@@ -847,6 +911,66 @@ UIScene.prototype.drawCooldownRing = function(progress){
     this.cdRing.strokePath();
 };
 
+UIScene.prototype.showCompletion = function(areaName){
+    var W=this.scale.width, H=this.scale.height, self=this;
+
+    // Full-screen flash
+    var flash = this.add.graphics().setDepth(90);
+    flash.fillStyle(0xa8d870, 0.35);
+    flash.fillRect(0,0,W,H);
+    this.tweens.add({ targets:flash, alpha:0, duration:800,
+        onComplete:function(){ flash.destroy(); }});
+
+    // Central celebration panel
+    var panel = this.add.graphics().setDepth(91);
+    panel.fillStyle(0x0e1e0e, 0.94);
+    panel.fillRoundedRect(W/2-140, H/2-70, 280, 140, 10);
+    panel.lineStyle(3, 0xa8d870, 1);
+    panel.strokeRoundedRect(W/2-140, H/2-70, 280, 140, 10);
+    panel.lineStyle(1, 0x5ab030, 0.5);
+    panel.strokeRoundedRect(W/2-136, H/2-66, 272, 132, 8);
+
+    var t1 = this.add.text(W/2, H/2-46, '🌿 AREA BLOOMED! 🌿',
+        Object.assign({},FONT,{fontSize:'9px', color:'#a8d870'}))
+        .setOrigin(0.5).setDepth(92);
+
+    var t2 = this.add.text(W/2, H/2-18, areaName.toUpperCase(),
+        Object.assign({},FONT,{fontSize:'7px', color:'#d4f088'}))
+        .setOrigin(0.5).setDepth(92);
+
+    var t3 = this.add.text(W/2, H/2+10, 'FULLY RESTORED!',
+        Object.assign({},FONT,{fontSize:'7px', color:'#5ab030'}))
+        .setOrigin(0.5).setDepth(92);
+
+    var t4 = this.add.text(W/2, H/2+38, 'Follow the arrow to the\nnext area ►',
+        Object.assign({},FONT,{fontSize:'6px', color:'#c8e870',
+        lineSpacing:6})).setOrigin(0.5).setDepth(92);
+
+    // Pulse the panel
+    this.tweens.add({ targets:[panel,t1,t2,t3,t4],
+        scaleX:1.03, scaleY:1.03, duration:600,
+        ease:'Sine.easeInOut', yoyo:true, repeat:2 });
+
+    // Auto-dismiss after 4s
+    this.time.delayedCall(4000, function(){
+        self.tweens.add({
+            targets:[panel,t1,t2,t3,t4], alpha:0, duration:500,
+            onComplete:function(){
+                panel.destroy(); t1.destroy(); t2.destroy();
+                t3.destroy(); t4.destroy();
+                // Persistent reminder at bottom
+                var reminder = self.add.text(W/2, H-30,
+                    '► Follow the glowing arrow to continue',
+                    Object.assign({},FONT,{fontSize:'5px', color:'#a8d870',
+                    backgroundColor:'#0e1e0e99', padding:{x:6,y:3}}))
+                    .setOrigin(0.5).setDepth(91);
+                self.tweens.add({targets:reminder, alpha:0.25,
+                    duration:1000, yoyo:true, repeat:-1});
+            }
+        });
+    });
+};
+
 UIScene.prototype.showFlash = function(msg){
     var self=this;
     this.flashMsg.setText(msg);
@@ -861,29 +985,53 @@ UIScene.prototype.showFlash = function(msg){
 // ═════════════════════════════════════════════════════════════
 
 function registerFlowAnims(scene){
-    var dirs=[
-        {key:'down', row:0},
-        {key:'left', row:1},
-        {key:'right',row:2},
-        {key:'up',   row:3},
+    // flow_td.png — 4 cols × 6 rows, 48×48 per frame
+    // Row 0: IDLE        (front-facing, 4 frames)
+    // Row 1: WALK UP     (away from camera, 4 frames)
+    // Row 2: WALK DOWN   (toward camera, 4 frames)
+    // Row 3: WALK LEFT   (4 frames)
+    // Row 4: WALK RIGHT  (4 frames)
+    // Row 5: CELEBRATE   (4 frames)
+    var dirs = [
+        { key:'down',  row:2 },
+        { key:'up',    row:1 },
+        { key:'left',  row:3 },
+        { key:'right', row:4 },
     ];
     dirs.forEach(function(d){
-        var base=d.row*4;
+        var base = d.row * 4;
         if(!scene.anims.exists('flow_walk_'+d.key)){
             scene.anims.create({
-                key:'flow_walk_'+d.key,
-                frames:scene.anims.generateFrameNumbers('flow_td',{frames:[base,base+1,base+2,base+1]}),
-                frameRate:8, repeat:-1
+                key:       'flow_walk_'+d.key,
+                frames:    scene.anims.generateFrameNumbers('flow_td',
+                               { frames:[base, base+1, base+2, base+1] }),
+                frameRate: 8, repeat:-1
             });
         }
         if(!scene.anims.exists('flow_idle_'+d.key)){
             scene.anims.create({
-                key:'flow_idle_'+d.key,
-                frames:scene.anims.generateFrameNumbers('flow_td',{frames:[base+3]}),
+                key:    'flow_idle_'+d.key,
+                frames: scene.anims.generateFrameNumbers('flow_td', { frames:[base+3] }),
                 frameRate:4, repeat:-1
             });
         }
     });
+    // Idle (neutral front-facing) = row 0
+    if(!scene.anims.exists('flow_idle')){
+        scene.anims.create({
+            key:    'flow_idle',
+            frames: scene.anims.generateFrameNumbers('flow_td', { start:0, end:3 }),
+            frameRate:5, repeat:-1
+        });
+    }
+    // Celebrate = row 5
+    if(!scene.anims.exists('flow_celebrate')){
+        scene.anims.create({
+            key:    'flow_celebrate',
+            frames: scene.anims.generateFrameNumbers('flow_td', { start:20, end:23 }),
+            frameRate:8, repeat:-1
+        });
+    }
 }
 
 function spawnParticle(scene,x,y,tint,count){
