@@ -3,8 +3,7 @@
  */
 
 const DOCS = {
-    novel: "https://docs.google.com/document/d/e/2PACX-1vQQEqb2qCfdzs_DAWDXN7cc8eouI_wHJAzjjznBgcxzFqaD27oBUZzn-8EUtCcL22Aj1_ecCF0E3jSn/pub",
-    manga: "https://docs.google.com/document/d/e/2PACX-1vQ20_WX4l0MVWCoUJ5ET-QJuAM3JCT4vPSaGALqdZcEWP92xaBtbIhIJvF1I4q-_lSLsulHCvxaltgD/pub"
+    novel: "https://docs.google.com/document/d/e/2PACX-1vQQEqb2qCfdzs_DAWDXN7cc8eouI_wHJAzjjznBgcxzFqaD27oBUZzn-8EUtCcL22Aj1_ecCF0E3jSn/pub"
 };
 
 const FLOW_SYSTEM_PROMPT = `
