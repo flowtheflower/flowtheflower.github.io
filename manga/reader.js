@@ -3,7 +3,14 @@ const pages = [
   "pages/002.jpg",
   "pages/003.jpg",
   "pages/004.jpg",
-  "pages/005.jpg"
+  "pages/005.jpg",
+  "pages/006.jpg",
+  "pages/007.jpg",
+  "pages/008.jpg",
+  "pages/009.jpg",
+  "pages/010.jpg",
+  "pages/011.jpg",
+  "pages/012.jpg"
 ];
 
 let current = 0;
