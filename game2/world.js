@@ -135,100 +135,97 @@ window.AREAS = {
         name:  'Pellet Town',
         cols:  20,
         rows:  18,
-        unlockRequires: null,  // always open
+        unlockRequires: null,
 
-        // 20×18 tilemap — new tile IDs matching extracted atlas
-        // 0-3=grass healthy, 4-7=grass flowers, 8-11=wilted,
-        // 12-15=wilted2, 16-19=water, 20-23=water2
+        // tileId = row*10 + col, maps to tileset_new.png grid
+        // Row 0 (y=34):  0=grass_lush 1=grass_flowers 2=grass_tan 3=dirt 4=dirt_dark
+        //                5=wilted1    6=wilted2        7=flowers   8=water_edge 9=grass_clean
+        // Row 1 (y=154): 10=water 11=water_grass 12=water_isle 13=water_mid 14=water_wide
+        //                15=water_rock 16=water_isle2 17=water_side 18=stone_arch 19=grass_r
+        // Row 2 (y=301): 20=wall_l 21=wall_mid 22=wall_corner 23=wall_open 24=wall_r
         tilemap: [
-          // row 0 — top border, dark grass
-          1,1,1,1,1, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0,16,16,16,16,
-          // row 1
-          1, 0, 0,1,1, 0, 0, 8, 8,10, 0, 0, 0, 0, 0, 0,16,17,17,16,
-          // row 2 — building interior
-          2, 2, 2, 2,1, 0, 3, 3, 8,10, 0, 0, 0, 0, 0, 0,18,17,17,18,
+          // row 0 — lush top border, water right edge
+           0, 0, 0, 0, 0, 0, 9, 9, 8,10,10,10,10, 8, 9, 9, 9, 9, 9, 9,
+          // row 1 — building top-left, path starts, water right
+           0, 2, 2, 0, 0, 9, 3, 3, 8,10,11,12,11,10, 8, 9, 9, 9, 1, 9,
+          // row 2 — building area
+           2, 2, 2, 2, 0, 9, 3, 3, 8,10,13,14,13,10, 8, 0, 0, 0, 1, 9,
           // row 3
-          2, 2, 2, 2,1, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0,18,17,16,18,
-          // row 4
-          1,1,1,1,1, 8, 3, 3, 3, 8, 0, 0, 8, 8, 0, 0,18,17,16,18,
-          // row 5
-          0, 0, 8, 8, 8, 8, 3, 3, 3, 8, 8, 8, 8, 0, 0, 0, 0, 0,18, 0,
-          // row 6
-          0, 0, 8, 8, 3, 3, 3, 3, 3, 3, 3, 8, 8, 0, 0, 0, 0, 0,18, 0,
-          // row 7 — Flow spawn
-          0, 0, 8, 0, 3, 3, 3, 3, 3, 3, 3, 3, 8, 8, 0, 0, 1, 0,18, 0,
+           2, 2, 2, 2, 0, 9, 3, 3, 3, 8,10,10,10, 8, 9, 0, 0, 0, 1, 9,
+          // row 4 — sign area, open ground
+           0, 0, 0, 0, 0, 5, 3, 3, 3, 3, 8, 8, 8, 9, 9, 0, 0, 0, 1, 9,
+          // row 5 — buzzy area, wilted patches start
+           0, 0, 5, 5, 5, 5, 3, 3, 3, 5, 5, 5, 5, 0, 0, 0, 9, 9,19, 9,
+          // row 6 — lamp post, more wilted
+           0, 0, 5, 5, 3, 3, 3, 3, 3, 3, 3, 5, 5, 0, 0, 0, 9, 9, 9, 9,
+          // row 7 — Flow spawn, central dirt path
+           0, 0, 5, 0, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5, 0, 0, 9, 9, 9, 9,
           // row 8
-          0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 0, 8, 8, 8, 0, 1, 1, 0, 0, 0,
+           0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 0, 5, 5, 5, 0, 0, 0, 0, 0, 0,
           // row 9
-          0, 8, 8, 0, 0, 3, 3, 3, 3, 0, 0, 8,10,10, 1, 1, 0, 0, 0, 0,
-          // row 10
-          0, 8, 8, 0, 0, 0, 3, 3, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+           0, 5, 5, 0, 0, 3, 3, 3, 3, 0, 0, 5, 6, 6, 0, 0, 0, 0, 0, 0,
+          // row 10 — stone wall fence
+           0, 5, 5, 0, 0, 0, 3, 3, 0, 0,20,21,21,21, 0, 0, 0, 0, 0, 0,
           // row 11
-          0, 0, 8, 0, 0, 0, 3, 3, 0, 0, 0, 8,10,10, 0, 0, 0, 0, 0, 0,
+           0, 0, 5, 0, 0, 0, 3, 3, 0, 0, 0, 5, 6, 6, 0, 0, 0, 0, 0, 0,
           // row 12
-          0, 0, 0, 8, 0, 0, 0, 8, 8, 8, 8, 8,10, 0, 0, 0, 0, 0, 0, 0,
-          // row 13
-          0, 0, 0, 8, 8, 8, 8,10,10,10,10, 8, 0, 0, 1, 0, 0, 0, 0, 0,
+           0, 0, 0, 5, 0, 0, 0, 5, 5, 5, 5, 5, 6, 0, 0, 0, 0, 0, 0, 0,
+          // row 13 — memorial zone
+           0, 0, 0, 5, 5, 5, 5, 6, 6, 6, 6, 5, 0, 0, 0, 0, 0, 0, 0, 0,
           // row 14
-          0, 0, 0, 0, 8, 8, 8,10,10,10,10,10, 0, 1, 1, 0, 0, 0, 0, 0,
+           0, 0, 0, 0, 5, 5, 5, 6, 6, 6, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0,
           // row 15
-          0, 0, 0, 0, 0, 8, 8, 8,10,10,10, 0, 1, 1, 0, 0, 0, 0, 0, 0,
+           0, 0, 0, 0, 0, 5, 5, 5, 6, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0,
           // row 16
-          0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+           0, 0, 0, 0, 0, 0, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
           // row 17 — bottom edge
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
 
-        // Player starting position (pixel coords)
-        playerStart: { x: 7*T + T/2, y: 7*T + T/2 },
+        playerStart: { x:7*T+T/2, y:7*T+T/2 },
 
-        // NPCs
         npcs: [
-            {
-                id:        'buzzy',
-                sprite:    'buzzy_ow',
-                x:         9*T + T/2,
-                y:         5*T + T/2,
-                direction: 'down',
-                dialogue:  'buzzy_intro',
-                repeat:    'buzzy_reminder',
-            },
+            { id:'buzzy', sprite:'buzzy_ow', x:9*T+T/2, y:5*T+T/2,
+              direction:'down', dialogue:'buzzy_intro', repeat:'buzzy_reminder' },
         ],
 
-        // Interactable objects (non-NPC)
         objects: [
-            { id:'sign_pellet',   x: 5*T+24, y: 4*T+12, sprite:'sign',     dialogue:'sign_pellet'   },
-            { id:'sign_history',  x: 2*T+24, y:11*T+12, sprite:'sign',     dialogue:'sign_history'  },
-            { id:'memorial',      x:12*T+24, y:13*T+12, sprite:'memorial', dialogue:'stone_memorial' },
+            { id:'sign_pellet',  x:5*T+24,  y:4*T+12,  sprite:'sign',     dialogue:'sign_pellet'   },
+            { id:'sign_history', x:2*T+24,  y:11*T+12, sprite:'sign',     dialogue:'sign_history'  },
+            { id:'memorial',     x:11*T+24, y:13*T+12, sprite:'memorial', dialogue:'stone_memorial' },
         ],
 
-        // Decorative objects (lamp post, rocks, trees — no interaction)
         decor: [
-            { type:'lamp',   x: 2*T+24, y: 6*T+8  },
-            { type:'rock',   x: 7*T+10, y: 5*T+20 },
-            { type:'rock',   x:11*T+20, y: 3*T+10 },
-            { type:'willow', x:18*T+16, y: 1*T+8  },
-            { type:'willow', x: 0*T+20, y: 5*T+8  },
-            { type:'willow', x: 1*T+10, y:10*T+8  },
+            { type:'tree_oak',  x:1*T+24,  y:0*T+32,  size:T*1.8 },
+            { type:'tree_pine', x:18*T+24, y:0*T+32,  size:T*1.6 },
+            { type:'tree_pine', x:19*T+24, y:3*T+32,  size:T*1.4 },
+            { type:'tree_pine', x:0*T+24,  y:5*T+32,  size:T*1.5 },
+            { type:'tree_pine', x:0*T+24,  y:10*T+32, size:T*1.4 },
+            { type:'lamp',      x:2*T+24,  y:6*T+16,  size:T*0.9 },
+            { type:'rock',      x:7*T+10,  y:5*T+20,  size:T*0.7 },
+            { type:'rock2',     x:11*T+20, y:3*T+10,  size:T*0.6 },
+            { type:'rock2',     x:14*T+10, y:8*T+20,  size:T*0.6 },
+            { type:'stump',     x:3*T+24,  y:14*T+20, size:T*0.8 },
+            { type:'log',       x:8*T+10,  y:15*T+10, size:T*0.9 },
+            { type:'plant',     x:5*T+24,  y:7*T+20,  size:T*0.8 },
+            { type:'plant2',    x:12*T+24, y:7*T+20,  size:T*0.7 },
+            { type:'flowers',   x:4*T+10,  y:12*T+10, size:T*0.8 },
+            { type:'flowers',   x:9*T+24,  y:14*T+20, size:T*0.7 },
+            { type:'bush',      x:5*T+10,  y:2*T+20,  size:T*1.0 },
         ],
 
-        // Exits to other areas
         exits: [
-            // Bottom edge: walk off → expanded garden (locked until 100% bloom)
-            { x:8*T, y:17*T, w:4*T, toArea:'expanded_garden', toX:8*T+T/2, toY:2*T, requiresBloom:100 },
+            { x:8*T, y:17*T, w:4*T, toArea:'expanded_garden',
+              toX:8*T+T/2, toY:2*T, requiresBloom:100 },
         ],
 
-        // Bloom zones: circles of bloomable tiles the player must restore
-        // These are visual guide rings, actual blooming is per-tile
         bloomZones: [
-            { cx: 8*T,  cy: 7*T,  r: 2*T, label:'Practice Zone A' },
-            { cx:12*T,  cy: 9*T,  r:2.5*T, label:'Practice Zone B' },
-            { cx: 8*T,  cy:13*T,  r: 2*T, label:'Practice Zone C' },
+            { cx:8*T,  cy:7*T,  r:2*T,   label:'Practice Zone A' },
+            { cx:12*T, cy:9*T,  r:2.5*T, label:'Practice Zone B' },
+            { cx:8*T,  cy:13*T, r:2*T,   label:'Practice Zone C' },
         ],
 
-        // On-complete dialogue (when all bloomable tiles restored)
         onComplete: 'buzzy_done',
-
         bgMusic: null,
         ambientColour: 0x2a4a1a,
     },
