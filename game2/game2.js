@@ -9,8 +9,8 @@
  *   DialogueScene  — launched OVER WorldScene, Pokémon-style text box
  *   UIScene        — HUD always on top
  *
- * Tile sheet: assets/tiles_garden.png — 6 cols × 4 rows, 48×48 each
- * Flow sheet: assets/flow_td.png      — 4 cols × 4 rows, 48×48 each
+ * Tile sheet: assets/tiles_garden.png — 10 cols × 7 rows, variable tile size
+ * Flow sheet: assets/flow_td.png      — 4 cols × 7 rows, 384×146 per frame
  *   Row 0: face DOWN  (cols 0-2=walk, col 3=idle)
  *   Row 1: face LEFT  (cols 0-2=walk, col 3=idle)
  *   Row 2: face RIGHT (cols 0-2=walk, col 3=idle)
@@ -76,10 +76,9 @@ BootScene.prototype.preload = function(){
     this.add.text(W/2,H/2+32,'LOADING...',
         Object.assign({},FONT,{fontSize:'8px',color:'#5ab030'})).setOrigin(0.5);
 
-    this.load.spritesheet('flow_td',   'assets/flow_td.png',
-        { frameWidth:48, frameHeight:48 });
-    this.load.spritesheet('tiles',     'assets/tiles_garden.png',
-        { frameWidth:48, frameHeight:48 });
+    this.load.spritesheet('flow_td', 'assets/flow_td.png',
+        { frameWidth:384, frameHeight:146 });
+    this.load.image('tiles', 'assets/tiles_garden.png');
     this.load.image('buzzy_ow',        'assets/buzzy_ow.png');
     this.load.image('kronik_trip_ow',  'assets/kronik_trip_ow.png');
     this.load.image('dr_leaf_ow',      'assets/dr_leaf_ow.png');
@@ -254,38 +253,70 @@ WorldScene.prototype.create = function(){
 
 WorldScene.prototype.buildTilemap = function(){
     var area = this.area;
+    // Tileset is one large image — we crop regions using CSS background-position
+    // Instead use Phaser image with crop rectangles per tile ID
+    // Tile grid in tileset_new.png:
+    // Cols (10): x=32,206,324,491,623,768,908,1043,1193,1366  widths ~135px each
+    // Rows (3 ground rows): y=34,154,301
+    // We display each tile at T×T pixels, cropped from the atlas
+    var TILE_COLS_X = [32,206,324,491,623,768,908,1043,1193,1366];
+    var TILE_ROWS_Y = [34,154,301];
+    var TILE_W = 135, TILE_H = 118;
+
     for(var row=0;row<area.rows;row++){
         for(var col=0;col<area.cols;col++){
             var tileId = this.tileState[row*area.cols+col];
-            var img = this.add.image(
-                col*T+T/2, row*T+T/2, 'tiles', tileId
-            ).setDisplaySize(T,T).setDepth(0);
+            var tCol   = tileId % 10;
+            var tRow   = Math.floor(tileId / 10);
+            if(tRow >= TILE_ROWS_Y.length) tRow = 0;
+            var sx = TILE_COLS_X[tCol] || 32;
+            var sy = TILE_ROWS_Y[tRow] || 34;
+
+            var rt = this.add.renderTexture(col*T, row*T, T, T).setDepth(0);
+            rt.drawFrame? null : null; // Phaser 3 renderTexture approach
+            // Simpler: use image with setCrop
+            var img = this.add.image(col*T+T/2, row*T+T/2, 'tiles')
+                .setDepth(0)
+                .setDisplaySize(T, T)
+                .setCrop(sx, sy, TILE_W, TILE_H);
             this.groundLayer.add(img);
         }
     }
 };
 
 WorldScene.prototype.buildDecor = function(){
-    var self=this;
+    var self = this;
+    // Object tiles in tileset — row 4 onwards (y=471+)
+    // Displayed as sprites from the tileset image
+    var OBJ_ROWS_Y  = [471, 589, 716, 829];
+    var TILE_COLS_X = [32,206,324,491,623,768,908,1043,1193,1366];
+    var TILE_W = 135;
+
     (this.area.decor||[]).forEach(function(d){
-        var col=0xffd080, sz=T;
-        switch(d.type){
-            case 'lamp':   col=0xd4a840; sz=T*0.6; break;
-            case 'rock':   col=0x808070; sz=T*0.7; break;
-            case 'willow': col=0x4a6830; sz=T*1.2; break;
-        }
-        var g=self.add.graphics().setDepth(10);
-        if(d.type==='lamp'){
-            g.fillStyle(0x5a4020,1); g.fillRect(d.x-4,d.y,8,T);
-            g.fillStyle(0xd4a840,0.9); g.fillCircle(d.x,d.y,10);
-        } else if(d.type==='willow'){
-            g.fillStyle(0x2a4015,0.85); g.fillEllipse(d.x,d.y,T,T*1.3);
-            g.fillStyle(0x3a5520,0.7);  g.fillEllipse(d.x+8,d.y+12,T*0.6,T*0.8);
-        } else if(d.type==='rock'){
-            g.fillStyle(0x706860,1); g.fillEllipse(d.x,d.y,T*0.65,T*0.4);
-            g.fillStyle(0x908878,1); g.fillEllipse(d.x-4,d.y-4,T*0.35,T*0.25);
-        }
-        self.decorLayer.add(g);
+        var objRow = 0, objCol = 0;
+        // Map decor type to tileset object position
+        var typeMap = {
+            'tree_oak':0,   'tree_pine':1,  'bush':2,      'rock':3,
+            'rock2':4,      'stump':5,       'log':6,       'plant':7,
+            'plant2':8,     'sign':10,       'barrel':11,   'crate':12,
+            'bench':13,     'lantern':14,    'fence':15,    'lamp':17,
+            'flowers':21,   'well':23,       'statue':24,   'memorial':25,
+            'chest':28,     'banner':21,     'willow':1,
+        };
+        var idx = typeMap[d.type] !== undefined ? typeMap[d.type] : 0;
+        objRow  = Math.floor(idx / 10);
+        objCol  = idx % 10;
+
+        var oy = OBJ_ROWS_Y[objRow] || 471;
+        var ox = TILE_COLS_X[objCol] || 32;
+        var oh = [80, 89, 76, 100][objRow] || 80;
+
+        var sz = d.size || T*1.4;
+        var img = self.add.image(d.x, d.y, 'tiles')
+            .setDepth(15)
+            .setDisplaySize(sz, sz)
+            .setCrop(ox, oy, TILE_W, oh);
+        self.decorLayer.add(img);
     });
 };
 
@@ -985,16 +1016,17 @@ UIScene.prototype.showFlash = function(msg){
 // ═════════════════════════════════════════════════════════════
 
 function registerFlowAnims(scene){
-    // flow_td.png — 4 cols × 6 rows, 48×48 per frame
-    // Row 0: IDLE        (front-facing, 4 frames)
-    // Row 1: WALK UP     (away from camera, 4 frames)
-    // Row 2: WALK DOWN   (toward camera, 4 frames)
-    // Row 3: WALK LEFT   (4 frames)
-    // Row 4: WALK RIGHT  (4 frames)
-    // Row 5: CELEBRATE   (4 frames)
+    // flow_td.png — 4 cols × 7 rows, 384×146 per frame
+    // Row 0: IDLE (front facing)
+    // Row 1: WALK DOWN (toward camera)
+    // Row 2: WALK UP (away from camera)
+    // Row 3: WALK LEFT
+    // Row 4: WALK RIGHT
+    // Row 5: INTERACT/WAVE
+    // Row 6: BLOOM/CELEBRATE
     var dirs = [
-        { key:'down',  row:2 },
-        { key:'up',    row:1 },
+        { key:'down',  row:1 },
+        { key:'up',    row:2 },
         { key:'left',  row:3 },
         { key:'right', row:4 },
     ];
@@ -1004,19 +1036,18 @@ function registerFlowAnims(scene){
             scene.anims.create({
                 key:       'flow_walk_'+d.key,
                 frames:    scene.anims.generateFrameNumbers('flow_td',
-                               { frames:[base, base+1, base+2, base+1] }),
+                               { frames:[base, base+1, base+2, base+3] }),
                 frameRate: 8, repeat:-1
             });
         }
         if(!scene.anims.exists('flow_idle_'+d.key)){
             scene.anims.create({
                 key:    'flow_idle_'+d.key,
-                frames: scene.anims.generateFrameNumbers('flow_td', { frames:[base+3] }),
+                frames: scene.anims.generateFrameNumbers('flow_td', { frames:[base] }),
                 frameRate:4, repeat:-1
             });
         }
     });
-    // Idle (neutral front-facing) = row 0
     if(!scene.anims.exists('flow_idle')){
         scene.anims.create({
             key:    'flow_idle',
@@ -1024,11 +1055,10 @@ function registerFlowAnims(scene){
             frameRate:5, repeat:-1
         });
     }
-    // Celebrate = row 5
     if(!scene.anims.exists('flow_celebrate')){
         scene.anims.create({
             key:    'flow_celebrate',
-            frames: scene.anims.generateFrameNumbers('flow_td', { start:20, end:23 }),
+            frames: scene.anims.generateFrameNumbers('flow_td', { start:24, end:27 }),
             frameRate:8, repeat:-1
         });
     }
