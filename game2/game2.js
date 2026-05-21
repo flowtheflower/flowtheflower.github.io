@@ -77,7 +77,7 @@ BootScene.prototype.preload = function(){
         Object.assign({},FONT,{fontSize:'8px',color:'#5ab030'})).setOrigin(0.5);
 
     this.load.spritesheet('flow_td', 'assets/flow_td.png',
-        { frameWidth:384, frameHeight:146 });
+        { frameWidth:80, frameHeight:80 });
     this.load.spritesheet('tiles', 'assets/tiles_garden.png',
         { frameWidth:64, frameHeight:64 });
     this.load.image('buzzy_ow',        'assets/buzzy_ow.png');
@@ -115,7 +115,7 @@ TitleScene.prototype.create = function(){
 
     // Flow character animated — frame 384x146, scale to ~110px wide
     registerFlowAnims(this);
-    var heroScale = 110 / 384;
+    var heroScale = 2.2;
     var hero = this.add.sprite(W/2, H*0.38, 'flow_td').setScale(heroScale);
     hero.play('flow_idle');
     this.tweens.add({targets:hero, y:H*0.38-6, duration:1400, ease:'Sine.easeInOut', yoyo:true, repeat:-1});
@@ -211,8 +211,8 @@ WorldScene.prototype.create = function(){
     this.player = this.physics.add.sprite(startX, startY, 'flow_td');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(50);
-    // Flow frame is 384x146 — scale down to fit T*1.2 display width
-    var flowScale = (T * 1.2) / 384;
+    // Flow frame is 80x80 — scale to fit nicely on map
+    var flowScale = (T * 1.1) / 80;
     this.player.setScale(flowScale);
     this.player.play('flow_idle_down');
     this.facing    = 'down';
@@ -996,14 +996,9 @@ UIScene.prototype.showFlash = function(msg){
 // ═════════════════════════════════════════════════════════════
 
 function registerFlowAnims(scene){
-    // flow_td.png — 4 cols × 7 rows, 384×146 per frame
-    // Row 0: IDLE (front facing)
-    // Row 1: WALK DOWN (toward camera)
-    // Row 2: WALK UP (away from camera)
-    // Row 3: WALK LEFT
-    // Row 4: WALK RIGHT
-    // Row 5: INTERACT/WAVE
-    // Row 6: BLOOM/CELEBRATE
+    // flow_td.png — 4 cols × 6 rows, 80×80 per frame
+    // Row 0: IDLE       Row 1: WALK DOWN   Row 2: WALK UP
+    // Row 3: WALK LEFT  Row 4: WALK RIGHT  Row 5: BLOOM/CELEBRATE
     var dirs = [
         { key:'down',  row:1 },
         { key:'up',    row:2 },
@@ -1024,22 +1019,22 @@ function registerFlowAnims(scene){
             scene.anims.create({
                 key:    'flow_idle_'+d.key,
                 frames: scene.anims.generateFrameNumbers('flow_td', { frames:[base] }),
-                frameRate:4, repeat:-1
+                frameRate: 4, repeat:-1
             });
         }
     });
     if(!scene.anims.exists('flow_idle')){
         scene.anims.create({
-            key:    'flow_idle',
-            frames: scene.anims.generateFrameNumbers('flow_td', { start:0, end:3 }),
-            frameRate:5, repeat:-1
+            key:       'flow_idle',
+            frames:    scene.anims.generateFrameNumbers('flow_td', { start:0, end:3 }),
+            frameRate: 5, repeat:-1
         });
     }
     if(!scene.anims.exists('flow_celebrate')){
         scene.anims.create({
-            key:    'flow_celebrate',
-            frames: scene.anims.generateFrameNumbers('flow_td', { start:24, end:27 }),
-            frameRate:8, repeat:-1
+            key:       'flow_celebrate',
+            frames:    scene.anims.generateFrameNumbers('flow_td', { start:20, end:23 }),
+            frameRate: 8, repeat:-1
         });
     }
 }
