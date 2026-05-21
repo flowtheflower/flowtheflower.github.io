@@ -78,7 +78,8 @@ BootScene.prototype.preload = function(){
 
     this.load.spritesheet('flow_td', 'assets/flow_td.png',
         { frameWidth:384, frameHeight:146 });
-    this.load.image('tiles', 'assets/tiles_garden.png');
+    this.load.spritesheet('tiles', 'assets/tiles_garden.png',
+        { frameWidth:64, frameHeight:64 });
     this.load.image('buzzy_ow',        'assets/buzzy_ow.png');
     this.load.image('kronik_trip_ow',  'assets/kronik_trip_ow.png');
     this.load.image('dr_leaf_ow',      'assets/dr_leaf_ow.png');
@@ -106,17 +107,18 @@ TitleScene.prototype.create = function(){
     bg.fillGradientStyle(0x1a2e1a,0x1a2e1a,0x0e1e0e,0x0e1e0e,1);
     bg.fillRect(0,0,W,H);
 
-    // Animated tile border using grass
-    for(var tx=0;tx<Math.ceil(W/T)+1;tx++){
-        this.add.image(tx*T+T/2, T/2,       'tiles',0).setDisplaySize(T,T).setAlpha(0.6);
-        this.add.image(tx*T+T/2, H-T/2,     'tiles',0).setDisplaySize(T,T).setAlpha(0.6);
-    }
+    // Simple grass border strips
+    var borderGfx = this.add.graphics();
+    borderGfx.fillStyle(0x2a5010, 1);
+    borderGfx.fillRect(0, 0, W, 8);
+    borderGfx.fillRect(0, H-8, W, 8);
 
-    // Flow character animated
+    // Flow character animated — frame 384x146, scale to ~110px wide
     registerFlowAnims(this);
-    var hero=this.add.sprite(W/2,H*0.38,'flow_td').setScale(2.5);
-    hero.play('flow_idle_down');
-    this.tweens.add({targets:hero,y:H*0.38-6,duration:1400,ease:'Sine.easeInOut',yoyo:true,repeat:-1});
+    var heroScale = 110 / 384;
+    var hero = this.add.sprite(W/2, H*0.38, 'flow_td').setScale(heroScale);
+    hero.play('flow_idle');
+    this.tweens.add({targets:hero, y:H*0.38-6, duration:1400, ease:'Sine.easeInOut', yoyo:true, repeat:-1});
 
     // Title
     this.add.text(W/2, H*0.58, 'FLOW:', Object.assign({},FONT,{
@@ -209,6 +211,9 @@ WorldScene.prototype.create = function(){
     this.player = this.physics.add.sprite(startX, startY, 'flow_td');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(50);
+    // Flow frame is 384x146 — scale down to fit T*1.2 display width
+    var flowScale = (T * 1.2) / 384;
+    this.player.setScale(flowScale);
     this.player.play('flow_idle_down');
     this.facing    = 'down';
     this.moving    = false;
@@ -253,32 +258,15 @@ WorldScene.prototype.create = function(){
 
 WorldScene.prototype.buildTilemap = function(){
     var area = this.area;
-    // Tileset is one large image — we crop regions using CSS background-position
-    // Instead use Phaser image with crop rectangles per tile ID
-    // Tile grid in tileset_new.png:
-    // Cols (10): x=32,206,324,491,623,768,908,1043,1193,1366  widths ~135px each
-    // Rows (3 ground rows): y=34,154,301
-    // We display each tile at T×T pixels, cropped from the atlas
-    var TILE_COLS_X = [32,206,324,491,623,768,908,1043,1193,1366];
-    var TILE_ROWS_Y = [34,154,301];
-    var TILE_W = 135, TILE_H = 118;
-
-    for(var row=0;row<area.rows;row++){
-        for(var col=0;col<area.cols;col++){
+    // tiles_garden.png is a 10×7 spritesheet, 64×64 per frame
+    // Frame index = row*10 + col
+    // tileId in tilemap = frame index directly
+    for(var row=0; row<area.rows; row++){
+        for(var col=0; col<area.cols; col++){
             var tileId = this.tileState[row*area.cols+col];
-            var tCol   = tileId % 10;
-            var tRow   = Math.floor(tileId / 10);
-            if(tRow >= TILE_ROWS_Y.length) tRow = 0;
-            var sx = TILE_COLS_X[tCol] || 32;
-            var sy = TILE_ROWS_Y[tRow] || 34;
-
-            var rt = this.add.renderTexture(col*T, row*T, T, T).setDepth(0);
-            rt.drawFrame? null : null; // Phaser 3 renderTexture approach
-            // Simpler: use image with setCrop
-            var img = this.add.image(col*T+T/2, row*T+T/2, 'tiles')
-                .setDepth(0)
+            var img = this.add.image(col*T+T/2, row*T+T/2, 'tiles', tileId)
                 .setDisplaySize(T, T)
-                .setCrop(sx, sy, TILE_W, TILE_H);
+                .setDepth(0);
             this.groundLayer.add(img);
         }
     }
@@ -286,36 +274,28 @@ WorldScene.prototype.buildTilemap = function(){
 
 WorldScene.prototype.buildDecor = function(){
     var self = this;
-    // Object tiles in tileset — row 4 onwards (y=471+)
-    // Displayed as sprites from the tileset image
-    var OBJ_ROWS_Y  = [471, 589, 716, 829];
-    var TILE_COLS_X = [32,206,324,491,623,768,908,1043,1193,1366];
-    var TILE_W = 135;
-
+    // Object tiles start at frame 30 in the atlas
+    // Row 3 (frames 30-39): tree_oak,tree_pine,bush,rock1,rock2,stump,log,plant1,plant2,?
+    // Row 4 (frames 40-49): sign,barrel,crate,bench,lantern,fence,stone_wall,lamp_post,?,?
+    // Row 5 (frames 50-59): grass_tuft,flowers_pink,flowers_red,flowers_yellow,flowers_purple,flowers_white,rock_pile,wall_stone,?,?
+    // Row 6 (frames 60-69): wall_brick,banner_blue,banner_green,well,statue,memorial,planter,chest_closed,chest_open,?
+    var typeMap = {
+        'tree_oak':30, 'tree_pine':31, 'bush':32,    'rock':33,   'rock2':34,
+        'stump':35,    'log':36,       'plant':37,   'plant2':38,
+        'sign':40,     'barrel':41,    'crate':42,   'bench':43,  'lantern':44,
+        'fence':45,    'lamp':47,
+        'flowers':51,  'flowers_red':52, 'flowers_yellow':53,
+        'rock_pile':56,
+        'banner':61,   'well':63,      'statue':64,  'memorial':65,
+        'planter':66,  'chest':67,
+    };
     (this.area.decor||[]).forEach(function(d){
-        var objRow = 0, objCol = 0;
-        // Map decor type to tileset object position
-        var typeMap = {
-            'tree_oak':0,   'tree_pine':1,  'bush':2,      'rock':3,
-            'rock2':4,      'stump':5,       'log':6,       'plant':7,
-            'plant2':8,     'sign':10,       'barrel':11,   'crate':12,
-            'bench':13,     'lantern':14,    'fence':15,    'lamp':17,
-            'flowers':21,   'well':23,       'statue':24,   'memorial':25,
-            'chest':28,     'banner':21,     'willow':1,
-        };
-        var idx = typeMap[d.type] !== undefined ? typeMap[d.type] : 0;
-        objRow  = Math.floor(idx / 10);
-        objCol  = idx % 10;
-
-        var oy = OBJ_ROWS_Y[objRow] || 471;
-        var ox = TILE_COLS_X[objCol] || 32;
-        var oh = [80, 89, 76, 100][objRow] || 80;
-
-        var sz = d.size || T*1.4;
-        var img = self.add.image(d.x, d.y, 'tiles')
-            .setDepth(15)
+        var frame = typeMap[d.type] !== undefined ? typeMap[d.type] : 30;
+        var sz    = d.size || T * 1.4;
+        var img = self.add.image(d.x, d.y, 'tiles', frame)
             .setDisplaySize(sz, sz)
-            .setCrop(ox, oy, TILE_W, oh);
+            .setDepth(d.y)
+            .setOrigin(0.5, 0.9);
         self.decorLayer.add(img);
     });
 };
@@ -521,7 +501,7 @@ WorldScene.prototype.tryBloom = function(){
     // Phase 1: hemp sprouts
     affected.forEach(function(tile,i){
         self.time.delayedCall(i*60, function(){
-            self.setTile(tile.idx, 13); // hemp_sprout
+            self.setTile(tile.idx, 8);  // flowers (hemp sprout visual)
             spawnParticle(self, tile.tx, tile.ty, 0x4aaa28, 4);
         });
     });
@@ -529,7 +509,7 @@ WorldScene.prototype.tryBloom = function(){
     // Phase 2: hemp dies back (HEMP_PHASE ms)
     affected.forEach(function(tile,i){
         self.time.delayedCall(HEMP_PHASE+i*30, function(){
-            self.setTile(tile.idx, 14); // grass_healing
+            self.setTile(tile.idx, 1);  // grass_flowers (healing stage)
             spawnParticle(self, tile.tx, tile.ty, 0x8acc48, 3);
         });
     });
@@ -537,7 +517,7 @@ WorldScene.prototype.tryBloom = function(){
     // Phase 3: full bloom
     affected.forEach(function(tile,i){
         self.time.delayedCall(BLOOM_DURATION-200+i*20, function(){
-            self.setTile(tile.idx, 12); // bloom_ground
+            self.setTile(tile.idx, 2);  // grass_lush (fully bloomed)
             spawnParticle(self, tile.tx, tile.ty, 0xc8e870, 6);
             self.bloomedTiles++;
         });
@@ -601,7 +581,7 @@ WorldScene.prototype.checkCompletion = function(){
     // 2. Bloom the whole map visually — replace any remaining wilted tiles
     for(var i=0;i<this.tileState.length;i++){
         var def = window.TILE_DEFS[this.tileState[i]];
-        if(def && def.bloomable) this.setTile(i, 12);
+        if(def && def.bloomable) this.setTile(i, 2); // grass_lush
     }
 
     // 3. Notify UIScene to show completion banner
