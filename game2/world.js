@@ -18,36 +18,39 @@
 var T = 48; // tile size in pixels
 
 // ── TILE DEFINITIONS ─────────────────────────────────────────
-// tiles_garden.png — 6 cols × 4 rows, 48×48 each
-// Row 0: grass variants (healthy ground)
-// Row 1: grass with flowers + wilted plants (start)
-// Row 2: more wilted + water tiles start
-// Row 3: water tiles
+// tiles_garden.png — 10 cols × 7 rows, 64×64 each
+// Frame = row*10 + col
 window.TILE_DEFS = {
-     0: { name:'grass_0',    walkable:true,  bloomable:false },
-     1: { name:'grass_1',    walkable:true,  bloomable:false },
-     2: { name:'grass_2',    walkable:true,  bloomable:false },
-     3: { name:'grass_3',    walkable:true,  bloomable:false },
-     4: { name:'grass_f0',   walkable:true,  bloomable:false },
-     5: { name:'grass_f1',   walkable:true,  bloomable:false },
-     6: { name:'grass_f2',   walkable:true,  bloomable:false },
-     7: { name:'grass_f3',   walkable:true,  bloomable:false },
-     8: { name:'wilted_0',   walkable:true,  bloomable:true  },
-     9: { name:'wilted_1',   walkable:true,  bloomable:true  },
-    10: { name:'wilted_2',   walkable:true,  bloomable:true  },
-    11: { name:'wilted_3',   walkable:true,  bloomable:true  },
-    12: { name:'wilted2_0',  walkable:true,  bloomable:true  },
-    13: { name:'wilted2_1',  walkable:true,  bloomable:true  },
-    14: { name:'wilted2_2',  walkable:true,  bloomable:true  },
-    15: { name:'wilted2_3',  walkable:true,  bloomable:true  },
-    16: { name:'water_0',    walkable:false, bloomable:false },
-    17: { name:'water_1',    walkable:false, bloomable:false },
-    18: { name:'water_2',    walkable:false, bloomable:false },
-    19: { name:'water_3',    walkable:false, bloomable:false },
-    20: { name:'water2_0',   walkable:false, bloomable:false },
-    21: { name:'water2_1',   walkable:false, bloomable:false },
-    22: { name:'water2_2',   walkable:false, bloomable:false },
-    23: { name:'water2_3',   walkable:false, bloomable:false },
+     0:{ name:'water_stone',  walkable:false, bloomable:false },
+     1:{ name:'grass_flowers',walkable:true,  bloomable:false },
+     2:{ name:'grass_lush',   walkable:true,  bloomable:false },
+     3:{ name:'dirt_tan',     walkable:true,  bloomable:false },
+     4:{ name:'dirt_dark',    walkable:true,  bloomable:false },
+     5:{ name:'wilted1',      walkable:true,  bloomable:true  },
+     6:{ name:'wilted2',      walkable:true,  bloomable:true  },
+     7:{ name:'seedling',     walkable:true,  bloomable:true  },
+     8:{ name:'flowers',      walkable:true,  bloomable:false },
+     9:{ name:'grass_clean',  walkable:true,  bloomable:false },
+    10:{ name:'water_full',   walkable:false, bloomable:false },
+    11:{ name:'water_grass_l',walkable:false, bloomable:false },
+    12:{ name:'water_grass_m',walkable:false, bloomable:false },
+    13:{ name:'water_grass_r',walkable:false, bloomable:false },
+    14:{ name:'water_mid_l',  walkable:false, bloomable:false },
+    15:{ name:'water_mid_m',  walkable:false, bloomable:false },
+    16:{ name:'water_isle',   walkable:false, bloomable:false },
+    17:{ name:'water_side',   walkable:false, bloomable:false },
+    18:{ name:'stone_arch',   walkable:false, bloomable:false },
+    19:{ name:'grass_right',  walkable:true,  bloomable:false },
+    20:{ name:'wall_left',    walkable:false, bloomable:false },
+    21:{ name:'wall_mid1',    walkable:false, bloomable:false },
+    22:{ name:'wall_mid2',    walkable:false, bloomable:false },
+    23:{ name:'wall_corner',  walkable:false, bloomable:false },
+    24:{ name:'wall_open',    walkable:true,  bloomable:false },
+    25:{ name:'wall_right',   walkable:false, bloomable:false },
+    26:{ name:'wall_cave',    walkable:true,  bloomable:false },
+    27:{ name:'stone_wall',   walkable:false, bloomable:false },
+    28:{ name:'blank',        walkable:true,  bloomable:false },
+    29:{ name:'grass_top',    walkable:true,  bloomable:false },
 };
 
 // ── DIALOGUE LIBRARY ─────────────────────────────────────────
