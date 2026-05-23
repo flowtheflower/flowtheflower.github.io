@@ -996,16 +996,17 @@ UIScene.prototype.showFlash = function(msg){
 // ═════════════════════════════════════════════════════════════
 
 function registerFlowAnims(scene){
-    // flow_td.png — 4 cols × 6 rows, 80×80 per frame
-    // Row 0: IDLE / WALK DOWN  (front facing, feet flat)
-    // Row 1: WALK UP           (back of head, legs kicking)
-    // Row 2: WALK LEFT         (side profile left)
-    // Row 3: WALK RIGHT        (side profile right)
-    // Row 4: INTERACT / WAVE   (front face, arms raised)
-    // Row 5: BLOOM/CELEBRATE   (sparkles)
+    // flow_td.png — 4 cols × 7 rows, 80×80 per frame
+    // Row 0: IDLE        (front facing, smiling, still)
+    // Row 1: WALK DOWN   (front facing, walking toward camera)
+    // Row 2: WALK LEFT   (side profile left)
+    // Row 3: WALK RIGHT  (side profile right)
+    // Row 4: WALK UP     (back of head, walking away)
+    // Row 5: INTERACT    (front, arms raised/waving)
+    // Row 6: BLOOM       (sparkles, celebrate)
     var dirs = [
-        { key:'down',  row:0 },
-        { key:'up',    row:1 },
+        { key:'down',  row:1 },
+        { key:'up',    row:4 },
         { key:'left',  row:2 },
         { key:'right', row:3 },
     ];
@@ -1015,32 +1016,30 @@ function registerFlowAnims(scene){
             scene.anims.create({
                 key:       'flow_walk_'+d.key,
                 frames:    scene.anims.generateFrameNumbers('flow_td',
-                               { frames:[base, base+1, base+2, base+3] }),
+                               { frames:[base,base+1,base+2,base+3] }),
                 frameRate: 8, repeat:-1
             });
         }
         if(!scene.anims.exists('flow_idle_'+d.key)){
             scene.anims.create({
                 key:    'flow_idle_'+d.key,
-                frames: scene.anims.generateFrameNumbers('flow_td', { frames:[base] }),
+                frames: scene.anims.generateFrameNumbers('flow_td',{ frames:[base] }),
                 frameRate: 4, repeat:-1
             });
         }
     });
-    // Idle = row 0 (front facing)
     if(!scene.anims.exists('flow_idle')){
         scene.anims.create({
-            key:       'flow_idle',
-            frames:    scene.anims.generateFrameNumbers('flow_td', { start:0, end:3 }),
-            frameRate: 5, repeat:-1
+            key:'flow_idle',
+            frames:scene.anims.generateFrameNumbers('flow_td',{start:0,end:3}),
+            frameRate:5, repeat:-1
         });
     }
-    // Celebrate = row 5
     if(!scene.anims.exists('flow_celebrate')){
         scene.anims.create({
-            key:       'flow_celebrate',
-            frames:    scene.anims.generateFrameNumbers('flow_td', { start:20, end:23 }),
-            frameRate: 8, repeat:-1
+            key:'flow_celebrate',
+            frames:scene.anims.generateFrameNumbers('flow_td',{start:24,end:27}),
+            frameRate:8, repeat:-1
         });
     }
 }
