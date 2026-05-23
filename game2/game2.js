@@ -997,13 +997,17 @@ UIScene.prototype.showFlash = function(msg){
 
 function registerFlowAnims(scene){
     // flow_td.png — 4 cols × 6 rows, 80×80 per frame
-    // Row 0: IDLE       Row 1: WALK DOWN   Row 2: WALK UP
-    // Row 3: WALK LEFT  Row 4: WALK RIGHT  Row 5: BLOOM/CELEBRATE
+    // Row 0: IDLE / WALK DOWN  (front facing, feet flat)
+    // Row 1: WALK UP           (back of head, legs kicking)
+    // Row 2: WALK LEFT         (side profile left)
+    // Row 3: WALK RIGHT        (side profile right)
+    // Row 4: INTERACT / WAVE   (front face, arms raised)
+    // Row 5: BLOOM/CELEBRATE   (sparkles)
     var dirs = [
-        { key:'down',  row:1 },
-        { key:'up',    row:2 },
-        { key:'left',  row:3 },
-        { key:'right', row:4 },
+        { key:'down',  row:0 },
+        { key:'up',    row:1 },
+        { key:'left',  row:2 },
+        { key:'right', row:3 },
     ];
     dirs.forEach(function(d){
         var base = d.row * 4;
@@ -1023,6 +1027,7 @@ function registerFlowAnims(scene){
             });
         }
     });
+    // Idle = row 0 (front facing)
     if(!scene.anims.exists('flow_idle')){
         scene.anims.create({
             key:       'flow_idle',
@@ -1030,6 +1035,7 @@ function registerFlowAnims(scene){
             frameRate: 5, repeat:-1
         });
     }
+    // Celebrate = row 5
     if(!scene.anims.exists('flow_celebrate')){
         scene.anims.create({
             key:       'flow_celebrate',
