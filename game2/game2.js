@@ -237,15 +237,14 @@ WorldScene.prototype.create = function(){
     // ── Input ──────────────────────────────────────────────
     this.input.on('pointerdown',function(ptr){
         if(self.dialogueLock) return;
-        // Convert screen tap to world coords
-        var wx = ptr.worldX;
-        var wy = ptr.worldY;
-        // Check if tapping Flow himself → bloom
+        // Use camera.getWorldPoint for reliable mobile coordinate conversion
+        var worldPt = self.cameras.main.getWorldPoint(ptr.x, ptr.y);
+        var wx = worldPt.x;
+        var wy = worldPt.y;
         var dx=wx-self.player.x, dy=wy-self.player.y;
         if(Math.sqrt(dx*dx+dy*dy) < 40){
             self.tryBloom();
         } else {
-            // Move to tapped position
             self.setMoveTarget(wx, wy);
         }
     });
