@@ -80,6 +80,7 @@ BootScene.prototype.preload = function(){
         { frameWidth:80, frameHeight:80 });
     this.load.spritesheet('tiles', 'assets/tiles_garden.png',
         { frameWidth:64, frameHeight:64 });
+    this.load.tilemapTiledJSON('pellet_town_map', 'assets/pellet_town.json');
     this.load.image('buzzy_ow',        'assets/buzzy_ow.png');
     this.load.image('kronik_trip_ow',  'assets/kronik_trip_ow.png');
     this.load.image('dr_leaf_ow',      'assets/dr_leaf_ow.png');
@@ -237,14 +238,30 @@ WorldScene.prototype.create = function(){
     // ── Input ──────────────────────────────────────────────
     this.input.on('pointerdown',function(ptr){
         if(self.dialogueLock) return;
-        // Use camera.getWorldPoint for reliable mobile coordinate conversion
-        var worldPt = self.cameras.main.getWorldPoint(ptr.x, ptr.y);
-        var wx = worldPt.x;
-        var wy = worldPt.y;
-        var dx=wx-self.player.x, dy=wy-self.player.y;
+
+        // Robust world coordinate conversion for all platforms including iPhone Safari
+        // ptr.x/y are in CSS pixels; account for canvas scale and scroll
+        var canvas  = self.sys.game.canvas;
+        var rect    = canvas.getBoundingClientRect();
+        var scaleX  = canvas.width  / rect.width;
+        var scaleY  = canvas.height / rect.height;
+        var cam     = self.cameras.main;
+        var sx      = (ptr.event.clientX - rect.left) * scaleX;
+        var sy      = (ptr.event.clientY - rect.top)  * scaleY;
+        var wx      = (sx / cam.zoom) + cam.worldView.x;
+        var wy      = (sy / cam.zoom) + cam.worldView.y;
+
+        var dx = wx - self.player.x;
+        var dy = wy - self.player.y;
+
         if(Math.sqrt(dx*dx+dy*dy) < 40){
             self.tryBloom();
         } else {
+            // Set facing direction immediately on tap so animation starts correct
+            var newFace;
+            if(Math.abs(dx) > Math.abs(dy)) newFace = dx>0 ? 'right' : 'left';
+            else                             newFace = dy>0 ? 'down'  : 'up';
+            self.facing = newFace;
             self.setMoveTarget(wx, wy);
         }
     });
@@ -257,15 +274,39 @@ WorldScene.prototype.create = function(){
 
 WorldScene.prototype.buildTilemap = function(){
     var area = this.area;
-    // tiles_garden.png is a 10×7 spritesheet, 64×64 per frame
-    // Frame index = row*10 + col
-    // tileId in tilemap = frame index directly
-    for(var row=0; row<area.rows; row++){
-        for(var col=0; col<area.cols; col++){
-            var tileId = this.tileState[row*area.cols+col];
-            var img = this.add.image(col*T+T/2, row*T+T/2, 'tiles', tileId)
-                .setDisplaySize(T, T)
-                .setDepth(0);
+    var mapKey = area.id + '_map';
+
+    // Use Phaser Tilemap if a JSON map exists for this area
+    if(this.cache.tilemap.has(mapKey)){
+        var map    = this.make.tilemap({ key: mapKey });
+        var tileset= map.addTilesetImage('tiles_garden', 'tiles', 64, 64, 0, 0);
+        var layer  = map.createLayer('ground', tileset, 0, 0);
+        layer.setDisplaySize(map.widthInPixels * (T/64), map.heightInPixels * (T/64));
+        layer.setScale(T/64);
+        layer.setDepth(0);
+        this.tiledMap   = map;
+        this.tiledLayer = layer;
+        this.groundLayer.add(layer);
+
+        // Sync tileState from Tiled map for bloom/walkability checks
+        for(var row=0; row<area.rows; row++){
+            for(var col=0; col<area.cols; col++){
+                var tile = map.getTileAt(col, row, false, 'ground');
+                if(tile){
+                    // Tiled IDs are 1-based; convert to 0-based frame index
+                    this.tileState[row*area.cols+col] = tile.index - 1;
+                }
+            }
+        }
+        return;
+    }
+
+    // Fallback: draw from tilemap array in world.js
+    for(var r=0; r<area.rows; r++){
+        for(var c=0; c<area.cols; c++){
+            var tileId = this.tileState[r*area.cols+c];
+            var img = this.add.image(c*T+T/2, r*T+T/2, 'tiles', tileId)
+                .setDisplaySize(T,T).setDepth(0);
             this.groundLayer.add(img);
         }
     }
@@ -540,14 +581,18 @@ WorldScene.prototype.tryBloom = function(){
 };
 
 WorldScene.prototype.setTile = function(idx, newId){
-    // Update state
-    this.tileState[idx]=newId;
-    // Update visual — rebuild the single tile image
-    var col=idx % this.area.cols;
-    var row=Math.floor(idx/this.area.cols);
-    // Find existing image by depth+position and update frame
-    // Simplest approach: destroy and recreate
-    var existing=this.groundLayer.getAll().find(function(obj){
+    this.tileState[idx] = newId;
+    var col = idx % this.area.cols;
+    var row = Math.floor(idx / this.area.cols);
+
+    // Update Tiled layer if present
+    if(this.tiledMap && this.tiledLayer){
+        this.tiledLayer.putTileAt(newId + 1, col, row); // +1 for Tiled 1-based
+        return;
+    }
+
+    // Update fallback image layer
+    var existing = this.groundLayer.getAll().find(function(obj){
         return Math.abs(obj.x-(col*T+T/2))<2 && Math.abs(obj.y-(row*T+T/2))<2;
     });
     if(existing) existing.setFrame(newId);
