@@ -80,7 +80,6 @@ BootScene.prototype.preload = function(){
         { frameWidth:80, frameHeight:80 });
     this.load.spritesheet('tiles', 'assets/tiles_garden.png',
         { frameWidth:64, frameHeight:64 });
-    this.load.tilemapTiledJSON('pellet_town_map', 'assets/pellet_town.json');
     this.load.image('buzzy_ow',        'assets/buzzy_ow.png');
     this.load.image('kronik_trip_ow',  'assets/kronik_trip_ow.png');
     this.load.image('dr_leaf_ow',      'assets/dr_leaf_ow.png');
@@ -273,40 +272,18 @@ WorldScene.prototype.create = function(){
 };
 
 WorldScene.prototype.buildTilemap = function(){
-    var area = this.area;
-    var mapKey = area.id + '_map';
+    var area = this;
+    var self = this;
+    var areaData = this.area;
 
-    // Use Phaser Tilemap if a JSON map exists for this area
-    if(this.cache.tilemap.has(mapKey)){
-        var map    = this.make.tilemap({ key: mapKey });
-        var tileset= map.addTilesetImage('tiles_garden', 'tiles', 64, 64, 0, 0);
-        var layer  = map.createLayer('ground', tileset, 0, 0);
-        layer.setDisplaySize(map.widthInPixels * (T/64), map.heightInPixels * (T/64));
-        layer.setScale(T/64);
-        layer.setDepth(0);
-        this.tiledMap   = map;
-        this.tiledLayer = layer;
-        this.groundLayer.add(layer);
-
-        // Sync tileState from Tiled map for bloom/walkability checks
-        for(var row=0; row<area.rows; row++){
-            for(var col=0; col<area.cols; col++){
-                var tile = map.getTileAt(col, row, false, 'ground');
-                if(tile){
-                    // Tiled IDs are 1-based; convert to 0-based frame index
-                    this.tileState[row*area.cols+col] = tile.index - 1;
-                }
-            }
-        }
-        return;
-    }
-
-    // Fallback: draw from tilemap array in world.js
-    for(var r=0; r<area.rows; r++){
-        for(var c=0; c<area.cols; c++){
-            var tileId = this.tileState[r*area.cols+c];
+    // Always use fallback image-based renderer — reliable on all platforms
+    // Tiled JSON is used only to define tile layout, not for Phaser's tilemap renderer
+    for(var r=0; r<areaData.rows; r++){
+        for(var c=0; c<areaData.cols; c++){
+            var tileId = this.tileState[r*areaData.cols+c];
             var img = this.add.image(c*T+T/2, r*T+T/2, 'tiles', tileId)
-                .setDisplaySize(T,T).setDepth(0);
+                .setDisplaySize(T,T)
+                .setDepth(0);
             this.groundLayer.add(img);
         }
     }
