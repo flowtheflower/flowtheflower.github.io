@@ -18,7 +18,7 @@
  */
 
 // ── CONSTANTS ────────────────────────────────────────────────
-var T           = 48;    // tile size px
+var T           = 64;    // tile size px — 64 gives much better visual quality
 var MOVE_SPEED  = 120;   // Flow movement px/s
 var BLOOM_RANGE = T * 2.5;  // bloom radius in px
 var BLOOM_COST  = 25;       // energy cost per bloom use
@@ -211,8 +211,8 @@ WorldScene.prototype.create = function(){
     this.player = this.physics.add.sprite(startX, startY, 'flow_td');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(50);
-    // Flow frame is 80x80 — scale to fit nicely on map
-    var flowScale = (T * 1.1) / 80;
+    // Flow frame is 80x80 — scale to fit nicely on map at T=64
+    var flowScale = (T * 1.0) / 80;
     this.player.setScale(flowScale);
     this.player.play('flow_idle_down');
     this.facing    = 'down';
@@ -238,31 +238,34 @@ WorldScene.prototype.create = function(){
     this.input.on('pointerdown',function(ptr){
         if(self.dialogueLock) return;
 
-        // Robust world coordinate conversion for all platforms including iPhone Safari
-        // ptr.x/y are in CSS pixels; account for canvas scale and scroll
-        var canvas  = self.sys.game.canvas;
-        var rect    = canvas.getBoundingClientRect();
-        var scaleX  = canvas.width  / rect.width;
-        var scaleY  = canvas.height / rect.height;
-        var cam     = self.cameras.main;
-        var sx      = (ptr.event.clientX - rect.left) * scaleX;
-        var sy      = (ptr.event.clientY - rect.top)  * scaleY;
-        var wx      = (sx / cam.zoom) + cam.worldView.x;
-        var wy      = (sy / cam.zoom) + cam.worldView.y;
+        // Phaser's ptr.worldX/worldY are correctly transformed for all platforms
+        // when using setScrollFactor and camera follow — just ensure we read
+        // from the main camera's pointer position
+        var cam = self.cameras.main;
+        var wx  = ptr.worldX;
+        var wy  = ptr.worldY;
+
+        // Fallback for platforms where worldX/Y may be unscaled
+        if(cam.zoom !== 1 || ptr.worldX === ptr.x){
+            wx = cam.worldView.x + (ptr.x / cam.zoom);
+            wy = cam.worldView.y + (ptr.y / cam.zoom);
+        }
 
         var dx = wx - self.player.x;
         var dy = wy - self.player.y;
 
         if(Math.sqrt(dx*dx+dy*dy) < 40){
             self.tryBloom();
-        } else {
-            // Set facing direction immediately on tap so animation starts correct
-            var newFace;
-            if(Math.abs(dx) > Math.abs(dy)) newFace = dx>0 ? 'right' : 'left';
-            else                             newFace = dy>0 ? 'down'  : 'up';
-            self.facing = newFace;
-            self.setMoveTarget(wx, wy);
+            return;
         }
+
+        // Determine and set facing BEFORE starting movement
+        var newFace;
+        if(Math.abs(dx) > Math.abs(dy)) newFace = dx > 0 ? 'right' : 'left';
+        else                             newFace = dy > 0 ? 'down'  : 'up';
+        self.facing = newFace;
+        self.player.play('flow_walk_' + self.facing, true);
+        self.setMoveTarget(wx, wy);
     });
 
     // ── Notify UIScene ─────────────────────────────────────
@@ -319,22 +322,19 @@ WorldScene.prototype.buildDecor = function(){
 
 WorldScene.prototype.buildObjects = function(){
     var self=this;
+    var typeMap = {
+        'sign':40, 'memorial':65, 'well':63, 'statue':64,
+        'chest':67, 'banner':61,
+    };
     (this.area.objects||[]).forEach(function(obj){
-        var g=self.add.graphics().setDepth(15);
-        if(obj.sprite==='sign'){
-            // Wooden sign
-            g.fillStyle(0x6a4218,1); g.fillRect(obj.x-18,obj.y+4,6,24);
-            g.fillStyle(0x8a5828,1); g.fillRoundedRect(obj.x-22,obj.y-14,44,22,3);
-            g.lineStyle(2,0x4a2808,1); g.strokeRoundedRect(obj.x-22,obj.y-14,44,22,3);
-        } else if(obj.sprite==='memorial'){
-            // Stone memorial
-            g.fillStyle(0x6a6a60,1); g.fillRoundedRect(obj.x-20,obj.y-28,40,42,4);
-            g.fillStyle(0x1a1a18,0.5); g.fillRect(obj.x-14,obj.y-22,28,30);
-            // Leaf symbol
-            g.fillStyle(0x3a5a28,0.8); g.fillEllipse(obj.x,obj.y-8,16,20);
-        }
-        self.objectSprites[obj.id] = g;
-        self.objLayer.add(g);
+        var frame = typeMap[obj.sprite] !== undefined ? typeMap[obj.sprite] : 40;
+        var sz    = T * 1.3;
+        var img = self.add.image(obj.x, obj.y, 'tiles', frame)
+            .setDisplaySize(sz, sz)
+            .setDepth(obj.y + 1)
+            .setOrigin(0.5, 0.85);
+        self.objectSprites[obj.id] = img;
+        self.objLayer.add(img);
     });
 };
 
@@ -342,15 +342,15 @@ WorldScene.prototype.buildNPCs = function(){
     var self=this;
     (this.area.npcs||[]).forEach(function(npc){
         var spr = self.physics.add.image(npc.x, npc.y, npc.sprite)
-            .setDisplaySize(T,T).setDepth(45).setImmovable(true);
-        // Name tag
-        var label = self.add.text(npc.x, npc.y-32, npc.id.replace('_',' '),
-            Object.assign({},FONT,{fontSize:'5px',color:'#e8f4c8',
-            backgroundColor:'#1a2e1a88',padding:{x:4,y:2}}))
-            .setOrigin(0.5).setDepth(55);
-        // Idle bob
-        self.tweens.add({targets:spr,y:npc.y-4,duration:1200+Math.random()*400,
-            ease:'Sine.easeInOut',yoyo:true,repeat:-1});
+            .setDisplaySize(T*1.5, T*1.5)
+            .setDepth(npc.y)
+            .setImmovable(true);
+        var label = self.add.text(npc.x, npc.y - T - 8, npc.id.replace(/_/g,' '),
+            Object.assign({},FONT,{fontSize:'6px',color:'#e8f4c8',
+            backgroundColor:'#1a2e1a99',padding:{x:5,y:3}}))
+            .setOrigin(0.5).setDepth(200);
+        self.tweens.add({targets:spr, y:npc.y-6, duration:1200+Math.random()*400,
+            ease:'Sine.easeInOut', yoyo:true, repeat:-1});
         self.npcSprites[npc.id]={sprite:spr,label:label,data:npc,talked:false};
         self.npcLayer.add(spr);
     });
@@ -481,12 +481,10 @@ WorldScene.prototype.update = function(time, delta){
 };
 
 WorldScene.prototype.setMoveTarget = function(wx, wy){
-    // Clamp to world bounds
     var worldW=this.area.cols*T, worldH=this.area.rows*T;
     this.targetX=Math.max(T/2,Math.min(worldW-T/2,wx));
     this.targetY=Math.max(T/2,Math.min(worldH-T/2,wy));
     this.moving=true;
-    this.player.play('flow_walk_'+this.facing,true);
 };
 
 WorldScene.prototype.tryBloom = function(){
