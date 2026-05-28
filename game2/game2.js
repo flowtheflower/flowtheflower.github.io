@@ -1024,8 +1024,8 @@ function registerFlowAnims(scene){
     // Row 5: INTERACT    (front, arms raised/waving)
     // Row 6: BLOOM       (sparkles, celebrate)
     var dirs = [
-        { key:'down',  row:1 },
-        { key:'up',    row:4 },
+        { key:'down',  row:0 },
+        { key:'up',    row:1 },
         { key:'left',  row:2 },
         { key:'right', row:3 },
     ];
