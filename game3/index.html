@@ -342,10 +342,11 @@ const waterMat = new THREE.ShaderMaterial({
 });
 
 function buildRiver(){
-  // Build the river as a flat RIBBON strip (not a round tube) so it reads as a
-  // water surface rather than a pipe. Each cross-section point is offset along
-  // the local tangent perpendicular to the flow direction, then snapped to the
-  // local terrain height minus a small carve depth so it sits nested in the ground.
+  // Build the river as a flat RIBBON strip following the planet's surface so it
+  // reads as a true water surface. The bank's inner edge sits flush with the
+  // water's edge (no raised lip at the seam) so nothing can occlude the water
+  // from a low third-person camera angle; banks only rise gently toward their
+  // OUTER edge, well away from the water itself.
   const N=140;
   const centerDirs=[];
   for(let i=0;i<=N;i++){
@@ -356,26 +357,28 @@ function buildRiver(){
     centerDirs.push(new THREE.Vector3(nx,ny,nz).normalize());
   }
 
-  const WATER_W=1.65;   // half-width of the water surface
-  const BANK_W=2.15;    // half-width including raised banks
-  const CARVE=0.20;     // depth below terrain the water sits at
-  const BANK_RAISE=0.06;// banks sit slightly proud of surrounding terrain
+  const WATER_W=2.4;    // half-width of the water surface (wide, clearly visible)
+  const BANK_W=3.1;     // half-width including the surrounding raised bank
+  const CARVE=0.08;     // very shallow carve so water sits nearly flush with terrain
 
-  function buildRibbon(halfWidth, carveDepth, segs){
+  function sideAt(i){
+    const dir=centerDirs[i];
+    const prev=centerDirs[Math.max(0,i-1)];
+    const next=centerDirs[Math.min(N,i+1)];
+    const travel=next.clone().sub(prev);
+    if(travel.lengthSq()<1e-8) travel.set(1,0,0);
+    travel.normalize();
+    return {dir, side:new THREE.Vector3().crossVectors(dir,travel).normalize()};
+  }
+
+  function buildStrip(wFn, rFn, segs){
     const positions=[], normals=[], uvs=[], indices=[];
     for(let i=0;i<=N;i++){
-      const dir=centerDirs[i];
-      const prev=centerDirs[Math.max(0,i-1)];
-      const next=centerDirs[Math.min(N,i+1)];
-      const travel=next.clone().sub(prev);
-      if(travel.lengthSq()<1e-8) travel.set(1,0,0);
-      travel.normalize();
-      const side=new THREE.Vector3().crossVectors(dir,travel).normalize();
-
+      const {dir, side}=sideAt(i);
       for(let s=0;s<=segs;s++){
-        const w=(s/segs*2-1)*halfWidth; // -halfWidth..+halfWidth
+        const w=wFn(s,segs);
         const offsetDir=dir.clone().addScaledVector(side, w/PR).normalize();
-        const r=terrainRadius(offsetDir)-carveDepth;
+        const r=rFn(offsetDir, s, segs);
         const p=offsetDir.clone().multiplyScalar(r);
         positions.push(p.x,p.y,p.z);
         normals.push(offsetDir.x,offsetDir.y,offsetDir.z);
@@ -396,94 +399,46 @@ function buildRiver(){
     return geo;
   }
 
-  // Water surface ribbon
-  const waterGeo=buildRibbon(WATER_W, CARVE, 10);
+  // Water surface: spans -WATER_W..+WATER_W, shallow uniform carve
+  const waterGeo=buildStrip(
+    (s,segs)=>(s/segs*2-1)*WATER_W,
+    (offsetDir)=>terrainRadius(offsetDir)-CARVE,
+    14
+  );
   river=new THREE.Mesh(waterGeo, waterMat);
   river.receiveShadow=true;
   planetGroup.add(river);
 
-  // Riverbank ribbon (wider, shallower carve so it frames the water as raised earth)
-  // Built as two separate strips (left bank + right bank) so they don't cover the water.
-  function buildBankSide(sign){
-    const positions=[], normals=[], uvs=[], indices=[];
-    const segs=6;
-    for(let i=0;i<=N;i++){
-      const dir=centerDirs[i];
-      const prev=centerDirs[Math.max(0,i-1)];
-      const next=centerDirs[Math.min(N,i+1)];
-      const travel=next.clone().sub(prev);
-      if(travel.lengthSq()<1e-8) travel.set(1,0,0);
-      travel.normalize();
-      const side=new THREE.Vector3().crossVectors(dir,travel).normalize();
-
-      for(let s=0;s<=segs;s++){
-        // From the water's edge (WATER_W) out to the bank's outer edge (BANK_W)
-        const w=sign*(WATER_W + (s/segs)*(BANK_W-WATER_W));
-        const offsetDir=dir.clone().addScaledVector(side, w/PR).normalize();
-        // Banks taper from slightly raised (near water) back down to ground level (outer edge)
-        const raise=BANK_RAISE*(1-s/segs);
-        const r=terrainRadius(offsetDir)+raise;
-        const p=offsetDir.clone().multiplyScalar(r);
-        positions.push(p.x,p.y,p.z);
-        normals.push(offsetDir.x,offsetDir.y,offsetDir.z);
-        uvs.push(s/segs, i/N);
-      }
-    }
-    for(let i=0;i<N;i++){
-      for(let s=0;s<segs;s++){
-        const a=i*(segs+1)+s, b=a+1, c=a+segs+1, d=c+1;
-        indices.push(a,c,b, b,c,d);
-      }
-    }
-    const geo=new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
-    geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals,3));
-    geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs,2));
-    geo.setIndex(indices);
-    return geo;
-  }
-
+  // Banks: one strip per side, inner edge flush with water (same CARVE, no lip),
+  // rising smoothly to a small bump only near the OUTER edge.
   const bankMat=new THREE.MeshStandardMaterial({color:0x6b5530,roughness:0.95});
-  const bankL=new THREE.Mesh(buildBankSide(1), bankMat);
-  const bankR=new THREE.Mesh(buildBankSide(-1), bankMat);
-  bankL.receiveShadow=true; bankL.castShadow=true;
-  bankR.receiveShadow=true; bankR.castShadow=true;
-  planetGroup.add(bankL); planetGroup.add(bankR);
+  [1,-1].forEach(sign=>{
+    const bankGeo=buildStrip(
+      (s,segs)=>sign*(WATER_W + (s/segs)*(BANK_W-WATER_W)),
+      (offsetDir,s,segs)=>{
+        const t=s/segs;
+        // Flush with water at t=0, rising only in the outer half
+        const raise=Math.max(0, t-0.4)/0.6 * 0.14;
+        return terrainRadius(offsetDir) - CARVE*(1-t) + raise;
+      },
+      8
+    );
+    const bank=new THREE.Mesh(bankGeo, bankMat);
+    bank.receiveShadow=true; bank.castShadow=true;
+    planetGroup.add(bank);
+  });
 
-  // Thin foam line right where water meets each bank
-  function buildFoamLine(sign){
-    const positions=[], uvs=[], indices=[];
-    const fw=0.12;
-    for(let i=0;i<=N;i++){
-      const dir=centerDirs[i];
-      const prev=centerDirs[Math.max(0,i-1)];
-      const next=centerDirs[Math.min(N,i+1)];
-      const travel=next.clone().sub(prev);
-      if(travel.lengthSq()<1e-8) travel.set(1,0,0);
-      travel.normalize();
-      const side=new THREE.Vector3().crossVectors(dir,travel).normalize();
-      for(let s=0;s<=1;s++){
-        const w=sign*(WATER_W-fw + s*fw);
-        const offsetDir=dir.clone().addScaledVector(side, w/PR).normalize();
-        const r=terrainRadius(offsetDir)-CARVE+0.02;
-        const p=offsetDir.clone().multiplyScalar(r);
-        positions.push(p.x,p.y,p.z);
-        uvs.push(s, i/N);
-      }
-    }
-    for(let i=0;i<N;i++){
-      const a=i*2, b=a+1, c=a+2, d=a+3;
-      indices.push(a,c,b, b,c,d);
-    }
-    const geo=new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs,2));
-    geo.setIndex(indices);
-    return geo;
-  }
-  const foamMat=new THREE.MeshBasicMaterial({color:0xf2feff,transparent:true,opacity:0.55,side:THREE.DoubleSide});
-  planetGroup.add(new THREE.Mesh(buildFoamLine(1), foamMat));
-  planetGroup.add(new THREE.Mesh(buildFoamLine(-1), foamMat));
+  // Thin foam line right at the water's edge on both sides
+  const foamMat=new THREE.MeshBasicMaterial({color:0xf2feff,transparent:true,opacity:0.6,side:THREE.DoubleSide});
+  [1,-1].forEach(sign=>{
+    const fw=0.18;
+    const foamGeo=buildStrip(
+      (s)=>sign*(WATER_W-fw + s*fw),
+      (offsetDir)=>terrainRadius(offsetDir)-CARVE+0.015,
+      1
+    );
+    planetGroup.add(new THREE.Mesh(foamGeo, foamMat));
+  });
 }
 let river=null;
 buildRiver();
