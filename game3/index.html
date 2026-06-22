@@ -342,11 +342,12 @@ const waterMat = new THREE.ShaderMaterial({
 });
 
 function buildRiver(){
-  // Build the river as a flat RIBBON strip following the planet's surface so it
-  // reads as a true water surface. The bank's inner edge sits flush with the
-  // water's edge (no raised lip at the seam) so nothing can occlude the water
-  // from a low third-person camera angle; banks only rise gently toward their
-  // OUTER edge, well away from the water itself.
+  // The base planet mesh is a SOLID, continuous sphere with no holes cut into
+  // it anywhere — so the river cannot be "carved into" the ground; it must sit
+  // visibly ABOVE the solid terrain surface, the same way trees/flowers/banks
+  // already do. A small downward offset would simply bury it inside the opaque
+  // ground mesh, invisible. This mirrors how the riverbank already correctly
+  // pokes up above terrain.
   const N=140;
   const centerDirs=[];
   for(let i=0;i<=N;i++){
@@ -357,9 +358,10 @@ function buildRiver(){
     centerDirs.push(new THREE.Vector3(nx,ny,nz).normalize());
   }
 
-  const WATER_W=2.4;    // half-width of the water surface (wide, clearly visible)
-  const BANK_W=3.1;     // half-width including the surrounding raised bank
-  const CARVE=0.08;     // very shallow carve so water sits nearly flush with terrain
+  const WATER_W=2.4;     // half-width of the water surface
+  const BANK_W=3.1;      // half-width including the surrounding raised bank
+  const WATER_RAISE=0.10;// water sits this far ABOVE the solid ground mesh
+  const BANK_RAISE=0.22; // bank's outer lip rises a bit higher than the water
 
   function sideAt(i){
     const dir=centerDirs[i];
@@ -399,27 +401,26 @@ function buildRiver(){
     return geo;
   }
 
-  // Water surface: spans -WATER_W..+WATER_W, shallow uniform carve
+  // Water surface: clearly above the solid ground everywhere across its width
   const waterGeo=buildStrip(
     (s,segs)=>(s/segs*2-1)*WATER_W,
-    (offsetDir)=>terrainRadius(offsetDir)-CARVE,
+    (offsetDir)=>terrainRadius(offsetDir)+WATER_RAISE,
     14
   );
   river=new THREE.Mesh(waterGeo, waterMat);
   river.receiveShadow=true;
   planetGroup.add(river);
 
-  // Banks: one strip per side, inner edge flush with water (same CARVE, no lip),
-  // rising smoothly to a small bump only near the OUTER edge.
+  // Banks: flush with the water's raised height at the inner edge, rising
+  // a little higher toward the outer edge so they read as a framing berm.
   const bankMat=new THREE.MeshStandardMaterial({color:0x6b5530,roughness:0.95});
   [1,-1].forEach(sign=>{
     const bankGeo=buildStrip(
       (s,segs)=>sign*(WATER_W + (s/segs)*(BANK_W-WATER_W)),
       (offsetDir,s,segs)=>{
         const t=s/segs;
-        // Flush with water at t=0, rising only in the outer half
-        const raise=Math.max(0, t-0.4)/0.6 * 0.14;
-        return terrainRadius(offsetDir) - CARVE*(1-t) + raise;
+        const raise=WATER_RAISE + t*(BANK_RAISE-WATER_RAISE);
+        return terrainRadius(offsetDir) + raise;
       },
       8
     );
@@ -428,13 +429,13 @@ function buildRiver(){
     planetGroup.add(bank);
   });
 
-  // Thin foam line right at the water's edge on both sides
-  const foamMat=new THREE.MeshBasicMaterial({color:0xf2feff,transparent:true,opacity:0.6,side:THREE.DoubleSide});
+  // Thin bright foam line right at the water's edge on both sides
+  const foamMat=new THREE.MeshBasicMaterial({color:0xf2feff,transparent:true,opacity:0.7,side:THREE.DoubleSide});
   [1,-1].forEach(sign=>{
-    const fw=0.18;
+    const fw=0.20;
     const foamGeo=buildStrip(
       (s)=>sign*(WATER_W-fw + s*fw),
-      (offsetDir)=>terrainRadius(offsetDir)-CARVE+0.015,
+      (offsetDir)=>terrainRadius(offsetDir)+WATER_RAISE+0.02,
       1
     );
     planetGroup.add(new THREE.Mesh(foamGeo, foamMat));
