@@ -18,7 +18,7 @@ canvas{display:block;position:fixed;top:0;left:0}
 .is-touch #interact-prompt{pointer-events:auto;cursor:pointer}
 .is-touch #interact-prompt .ip-inner{cursor:pointer}
 .is-touch #interact-prompt:active{transform:translateX(-50%) scale(0.95)}
-#interact-prompt .ip-inner{background:rgba(0,0,0,.72);backdrop-filter:blur(10px);border:1.5px solid rgba(120,255,160,.4);border-radius:50px;padding:10px 22px;color:#8fff9a;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+#interact-prompt .ip-inner{background:rgba(10,30,20,.85);backdrop-filter:blur(16px);border:1.5px solid rgba(120,255,160,.5);border-radius:50px;padding:11px 26px;color:#9fff9a;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;box-shadow:0 4px 20px rgba(0,255,100,.15)}
 
 /* Dialogue */
 #dlg{position:fixed;bottom:0;left:0;right:0;z-index:40;transform:translateY(105%);transition:transform .38s cubic-bezier(.22,1,.36,1);max-width:600px;margin:0 auto}
@@ -101,8 +101,8 @@ const CHAR_SCALE = 0.90;  // character scale
 const FOOT_OFFSET = 0.176; // distance from flowRoot origin (y=0) down to the actual sole bottom, at CHAR_SCALE
 const WALK_SPD = 0.022;   // radians/frame approx
 const RUN_SPD  = 0.055;
-const CAM_BACK = 6.5;     // camera distance behind player
-const CAM_UP   = 2.8;     // camera height above player
+const CAM_BACK = 7.5;     // camera distance behind player
+const CAM_UP   = 5.2;     // camera height above player
 const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints>0);
 if(IS_TOUCH) document.body.classList.add('is-touch');
 
@@ -116,7 +116,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.35;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
@@ -173,10 +173,10 @@ scene.add(skyDome);
 // ═══════════════════════════════════════════════════════════
 // LIGHTING
 // ═══════════════════════════════════════════════════════════
-const hemi = new THREE.HemisphereLight(0x9ad5c0, 0x184010, 2.0);
+const hemi = new THREE.HemisphereLight(0xfff4e0, 0x1a3a10, 2.2);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xffe5b0, 4.5);
+const sun = new THREE.DirectionalLight(0xffcc66, 5.5);
 sun.position.set(28,55,20);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048,2048);
@@ -185,8 +185,9 @@ sun.shadow.camera.left=sun.shadow.camera.bottom=-55;
 sun.shadow.camera.right=sun.shadow.camera.top=55;
 sun.shadow.bias=-0.0005; sun.shadow.normalBias=0.03;
 scene.add(sun);
-const fill2=new THREE.DirectionalLight(0x5599ff,0.7); fill2.position.set(-20,5,-18); scene.add(fill2);
-const rim=new THREE.DirectionalLight(0xff8833,0.35); rim.position.set(0,-30,0); scene.add(rim);
+const fill2=new THREE.DirectionalLight(0x88bbff,0.5); fill2.position.set(-20,8,-18); scene.add(fill2);
+const rim=new THREE.DirectionalLight(0xffaa44,0.6); rim.position.set(0,-30,0); scene.add(rim);
+const bounce=new THREE.DirectionalLight(0x88ff99,0.3); bounce.position.set(0,0,-30); scene.add(bounce);
 
 // ═══════════════════════════════════════════════════════════
 // PLANET GEOMETRY  (vertex-coloured displaced sphere)
@@ -231,7 +232,61 @@ for(let i=0;i<planPos.count;i++){
 }
 planGeo.computeVertexNormals();
 planGeo.setAttribute('color', new THREE.BufferAttribute(planColArr,3));
-const planMat = new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.88, metalness:0});
+const terrainUniforms={
+  time:{value:0},
+  lightDir:{value:new THREE.Vector3(0.4,0.8,0.3).normalize()}
+};
+const planMat = new THREE.ShaderMaterial({
+  uniforms:terrainUniforms,
+  vertexColors:true,
+  lights:false,
+  vertexShader:`
+    varying vec3 vColor;
+    varying vec3 vNorm;
+    varying vec3 vPos;
+    void main(){
+      vColor=color;
+      vNorm=normalMatrix*normal;
+      vPos=position;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);
+    }
+  `,
+  fragmentShader:`
+    varying vec3 vColor;
+    varying vec3 vNorm;
+    varying vec3 vPos;
+    uniform vec3 lightDir;
+
+    float hash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5); }
+    float noise(vec3 p){
+      vec3 i=floor(p*8.0);
+      vec3 f=fract(p*8.0);
+      f=f*f*(3.0-2.0*f);
+      float n=mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),
+                  mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+               mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
+                  mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
+      return n;
+    }
+
+    void main(){
+      vec3 n=normalize(vNorm);
+      // Diffuse with warm sun
+      float diff=max(dot(n,normalize(lightDir)),0.0)*0.85+0.15;
+      // Micro grass texture
+      float micro=noise(vPos*1.4)*0.12+noise(vPos*3.1)*0.06;
+      // Slope darkening (valleys feel deeper)
+      float slope=1.0-abs(dot(n,normalize(vPos)))*0.18;
+      // Fresnel-like rim brightening on surfaces facing camera-up
+      float rim=pow(clamp(1.0-dot(n,vec3(0,1,0)),0.0,1.0),3.0)*0.12;
+      vec3 col=vColor*(diff+micro)*slope;
+      // Warm highlight on tops of hills (golden hour top-light)
+      col=mix(col, col*vec3(1.12,1.08,0.9), clamp(dot(n,vec3(0,1,0))*0.5,0.0,1.0));
+      col+=rim*vec3(0.8,0.9,1.0);
+      gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
+    }
+  `
+});
 const planet = new THREE.Mesh(planGeo, planMat);
 planet.receiveShadow=true;
 planetGroup.add(planet);
@@ -444,6 +499,154 @@ function buildRiver(){
 let river=null;
 buildRiver();
 
+// ── CHERRY BLOSSOM HERO TREE ──────────────────────────────────────────────────
+{
+  const cherryDir=new THREE.Vector3(-0.15,1,0.35).normalize();
+  const g=new THREE.Group();
+  const trunkMat=new THREE.MeshStandardMaterial({color:0x4a2010,roughness:0.9});
+  // Gnarled trunk
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.28,3.2,10),trunkMat);
+  trunk.position.y=1.6; trunk.rotation.z=0.12; trunk.castShadow=true; g.add(trunk);
+  // Blossom cloud clusters
+  const blossomMat=new THREE.MeshStandardMaterial({color:0xff88bb,roughness:0.7,
+    emissive:new THREE.Color(0xff4488),emissiveIntensity:0.08});
+  const blossomPos=[
+    [0,3.8,0,1.5],[0.8,3.4,0.4,1.1],[-0.7,3.5,-0.3,1.0],
+    [0.3,4.5,-0.5,0.9],[-0.4,4.2,0.6,0.95],[0,3.0,0.7,0.8]
+  ];
+  blossomPos.forEach(([x,y,z,r])=>{
+    const b=new THREE.Mesh(new THREE.SphereGeometry(r,12,10),blossomMat);
+    b.position.set(x,y,z); b.castShadow=true; g.add(b);
+  });
+
+  const up=cherryDir.clone().normalize();
+  const qAlign=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),up);
+  g.quaternion.copy(qAlign);
+  g.position.copy(up.multiplyScalar(terrainRadius(up)+0.05));
+  planetGroup.add(g);
+}
+
+
+// ── LAMP POSTS (evocative warm-light features) ────────────────────────────────
+{
+  const lampMat=new THREE.MeshStandardMaterial({color:0x8b7340,roughness:0.5,metalness:0.5});
+  const glassMat=new THREE.MeshStandardMaterial({color:0xffee99,emissive:new THREE.Color(0xffcc44),emissiveIntensity:1.2,transparent:true,opacity:0.85});
+  const lampDirs=[
+    new THREE.Vector3(0.28,1,0.08).normalize(),
+    new THREE.Vector3(-0.1,1,0.3).normalize(),
+    new THREE.Vector3(0.1,1,-0.25).normalize(),
+    new THREE.Vector3(0.45,1,-0.1).normalize(),
+    new THREE.Vector3(-0.25,1,-0.15).normalize(),
+  ];
+  lampDirs.forEach(dir=>{
+    const g=new THREE.Group();
+    // Post
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.075,2.2,8),lampMat);
+    post.position.y=1.1; post.castShadow=true; g.add(post);
+    // Arm
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.6,6),lampMat);
+    arm.rotation.z=Math.PI/2; arm.position.set(0.3,2.2,0); g.add(arm);
+    // Lantern cage
+    const cage=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.28,8),lampMat);
+    cage.position.set(0.6,2.2,0); g.add(cage);
+    // Glass glow
+    const glass=new THREE.Mesh(new THREE.SphereGeometry(0.11,8,8),glassMat);
+    glass.position.set(0.6,2.2,0); g.add(glass);
+    // Cap
+    const cap=new THREE.Mesh(new THREE.ConeGeometry(0.14,0.15,8),lampMat);
+    cap.position.set(0.6,2.37,0); g.add(cap);
+
+    const up=dir.clone().normalize();
+    const qAlign=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),up);
+    g.quaternion.copy(qAlign);
+    const groundR=terrainRadius(up);
+    g.position.copy(up.multiplyScalar(groundR+0.05));
+    planetGroup.add(g);
+  });
+}
+
+
+// ── POND + FOUNTAIN (focal feature near the starting area) ──────────────────
+{
+  const pondDir=new THREE.Vector3(0.18,1,0.12).normalize();
+  const pondR=terrainRadius(pondDir)+0.08;
+  const pondPos=pondDir.multiplyScalar(pondR);
+  const pondUp=pondDir.clone().normalize();
+
+  // Build a flat circular pond disc
+  const pondGeo=new THREE.CircleGeometry(2.2,48);
+  const pondMesh=new THREE.Mesh(pondGeo,waterMat);
+  const qPond=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),pondUp);
+  pondMesh.quaternion.copy(qPond);
+  pondMesh.position.copy(pondPos);
+  pondMesh.receiveShadow=true;
+  planetGroup.add(pondMesh);
+
+  // Stone surround ring
+  const ringGeo=new THREE.TorusGeometry(2.25,0.22,8,40);
+  const stoneMat=new THREE.MeshStandardMaterial({color:0x9a8870,roughness:0.88});
+  const ring=new THREE.Mesh(ringGeo,stoneMat);
+  ring.quaternion.copy(qPond);
+  ring.position.copy(pondDir.clone().normalize().multiplyScalar(pondR+0.04));
+  ring.castShadow=true;
+  planetGroup.add(ring);
+
+  // Fountain pillar
+  const pillarGeo=new THREE.CylinderGeometry(0.12,0.18,1.2,12);
+  const pillar=new THREE.Mesh(pillarGeo,stoneMat);
+  const pondPivot=new THREE.Group();
+  pondPivot.add(pillar);
+  pillar.position.y=0.6;
+
+  // Fountain basin
+  const basinGeo=new THREE.CylinderGeometry(0.55,0.45,0.18,16);
+  const basin=new THREE.Mesh(basinGeo,stoneMat);
+  basin.position.y=1.22;
+  pondPivot.add(basin);
+
+  // Fountain top sphere
+  const topGeo=new THREE.SphereGeometry(0.14,10,8);
+  const topMat=new THREE.MeshStandardMaterial({color:0xbbaa88,roughness:0.4,metalness:0.3});
+  const top=new THREE.Mesh(topGeo,topMat);
+  top.position.y=1.46;
+  pondPivot.add(top);
+
+  // Water spray (translucent spheres as droplets, animated in loop)
+  const sprayMat=new THREE.MeshBasicMaterial({color:0xaaeeff,transparent:true,opacity:0.55});
+  const sprays=[];
+  for(let s=0;s<8;s++){
+    const ang=s/8*Math.PI*2;
+    const sp=new THREE.Mesh(new THREE.SphereGeometry(0.07,6,6),sprayMat);
+    sp.position.set(Math.cos(ang)*0.3,1.6+Math.random()*0.3,Math.sin(ang)*0.3);
+    sp.userData={baseY:sp.position.y, ang, phase:s/8*Math.PI*2};
+    pondPivot.add(sp);
+    sprays.push(sp);
+  }
+  pondPivot.userData={sprays};
+
+  const qPond2=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),pondUp);
+  pondPivot.quaternion.copy(qPond2);
+  pondPivot.position.copy(pondDir.clone().normalize().multiplyScalar(pondR+0.1));
+  planetGroup.add(pondPivot);
+  window._pondPivot=pondPivot;
+
+  // Lily pads
+  const lilyMat=new THREE.MeshStandardMaterial({color:0x2a8a2a,roughness:0.8,side:THREE.DoubleSide});
+  for(let l=0;l<6;l++){
+    const la=l/6*Math.PI*2+0.4;
+    const lr=0.7+Math.random()*1.1;
+    const lilyGeo=new THREE.CircleGeometry(0.22+Math.random()*0.12,12);
+    const lily=new THREE.Mesh(lilyGeo,lilyMat);
+    const lilyOffset=new THREE.Vector3(Math.cos(la)*lr/PR,0,Math.sin(la)*lr/PR);
+    const lilyDir=pondDir.clone().normalize().add(lilyOffset).normalize();
+    const q2=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),lilyDir);
+    lily.quaternion.copy(q2);
+    lily.position.copy(lilyDir.multiplyScalar(pondR+0.04));
+    planetGroup.add(lily);
+  }
+}
+
+
 // ═══════════════════════════════════════════════════════════
 // FLOWERS
 // ═══════════════════════════════════════════════════════════
@@ -648,10 +851,10 @@ for(let i=0;i<28;i++){
 
 // ── Grass blades ──────────────────────────────────────────
 const gBladeMat=new THREE.MeshStandardMaterial({color:0x3aaa3a,roughness:1,side:THREE.DoubleSide});
-for(let i=0;i<250;i++){
+for(let i=0;i<480;i++){
   const dir=new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize();
   const g=new THREE.Group();
-  for(let b=0;b<5;b++){
+  for(let b=0;b<7;b++){
     const h=.14+Math.random()*.16;
     const blade=new THREE.Mesh(new THREE.CylinderGeometry(.006,.016,h,5),gBladeMat);
     blade.position.set((Math.random()-.5)*.07,h*.5,(Math.random()-.5)*.07);
@@ -1493,7 +1696,7 @@ function updateCamera(){
   }
   const behindDir=camFwd.clone().negate();
 
-  const target=footPos.clone().addScaledVector(up, 0.95);
+  const target=footPos.clone().addScaledVector(up, 1.2);
   const desired=footPos.clone()
     .addScaledVector(behindDir, CAM_BACK)
     .addScaledVector(up, CAM_UP);
@@ -1716,6 +1919,8 @@ function loop(){
   gt+=dt;
 
   waterUniforms.time.value=gt;
+  terrainUniforms.time.value=gt;
+  terrainUniforms.lightDir.value.copy(sun.position).normalize();
   skyDome.rotation.y+=dt*.0004;
 
   if(!started){ renderer.render(scene,camera); return; }
@@ -1729,6 +1934,17 @@ function loop(){
   updateButterflies(gt);
   updateFlowers(gt);
   checkNearNpc();
+
+  // Animate fountain spray droplets
+  if(window._pondPivot){
+    window._pondPivot.userData.sprays.forEach((sp,i)=>{
+      sp.userData.phase+=0.06;
+      sp.position.y=sp.userData.baseY+Math.sin(sp.userData.phase)*0.18;
+      sp.position.x=Math.cos(sp.userData.ang+sp.userData.phase*0.2)*0.3;
+      sp.position.z=Math.sin(sp.userData.ang+sp.userData.phase*0.2)*0.3;
+      sp.material.opacity=0.3+Math.sin(sp.userData.phase+1)*0.3;
+    });
+  }
 
   renderer.render(scene,camera);
 }
